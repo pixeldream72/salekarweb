@@ -74,7 +74,10 @@ function VariantRow({ variant }) {
       }}
     >
       <span className="variant-color" style={{ minWidth: '80px' }}>{variant.color || 'Default'}</span>
-      <span className="variant-price" style={{ minWidth: '80px' }}>PKR {variant.price}</span>
+      <span className="variant-price" style={{ minWidth: '80px' }}>
+        PKR {variant.price}
+        {variant.unit ? <span className="variant-unit" style={{ color: '#64748b', marginLeft: '0.18rem' }}>/{variant.unit}</span> : null}
+      </span>
 
       <div className="variant-controls" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <button type="button" onClick={handleDecrease} style={{ width: '32px' }}>-</button>
@@ -86,7 +89,6 @@ function VariantRow({ variant }) {
           style={{ width: '50px', textAlign: 'center' }}
         />
         <button type="button" onClick={handleIncrease} style={{ width: '32px' }}>+</button>
-        <span className="variant-unit" style={{ color: '#64748b' }}>{variant.unit}</span>
       </div>
 
       <button type="button" className="header-button primary" onClick={handleAdd}>
@@ -109,6 +111,7 @@ function ProductsPage() {
   const [source, setSource] = useState('loading');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
