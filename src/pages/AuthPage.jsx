@@ -4,7 +4,7 @@ import { supabase } from '../services/supabaseClient.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
 const initialLoginState = { email: '', password: '' };
-const initialSignupState = { email: '', password: '', confirmPassword: '' };
+const initialSignupState = { fullName: '', phone: '', email: '', password: '', confirmPassword: '' };
 const initialResetState = { email: '' };
 
 function getFriendlyMessage(error) {
@@ -45,11 +45,13 @@ function getFriendlyMessage(error) {
   return message || 'Something went wrong. Please try again.';
 }
 
-function AuthPage() {
+function AuthPage({ initialMode = 'login' }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { session, authLoading } = useAuth();
   const from = location.state?.from || '/';
+
+  const [mode, setMode] = useState(initialMode); // 'login' | 'signup' | 'reset'
 
   const [loginForm, setLoginForm] = useState(initialLoginState);
   const [signupForm, setSignupForm] = useState(initialSignupState);
@@ -70,10 +72,10 @@ function AuthPage() {
   }, [authLoading, session, navigate, from]);
 
   const canSubmitLogin = useMemo(() => loginForm.email && loginForm.password, [loginForm]);
-  const canSubmitSignup = useMemo(
-    () => signupForm.email && signupForm.password && signupForm.confirmPassword,
-    [signupForm],
-  );
+ const canSubmitSignup = useMemo(
+  () => signupForm.fullName && signupForm.phone && signupForm.email && signupForm.password && signupForm.confirmPassword,
+  [signupForm],
+);
   const canSubmitReset = useMemo(() => resetForm.email, [resetForm]);
 
   if (authLoading) {
@@ -116,41 +118,56 @@ function AuthPage() {
     }
   };
 
-  const handleSignupSubmit = async (event) => {
-    event.preventDefault();
-    setSignupError('');
+ const handleSignupSubmit = async (event) => {
+  event.preventDefault();
+  setSignupError('');
 
-    if (!signupForm.email || !signupForm.password || !signupForm.confirmPassword) {
-      setSignupError('Please complete all required fields.');
-      return;
+  if (!signupForm.fullName || !signupForm.phone || !signupForm.email || !signupForm.password || !signupForm.confirmPassword) {
+    setSignupError('Please complete all required fields.');
+    return;
+  }
+
+  if (signupForm.password !== signupForm.confirmPassword) {
+    setSignupError('Passwords do not match.');
+    return;
+  }
+
+  try {
+    setIsSubmittingSignup(true);
+    const { data, error } = await supabase.auth.signUp({
+      email: signupForm.email.trim(),
+      password: signupForm.password,
+    });
+
+    if (error) {
+      throw error;
     }
 
-    if (signupForm.password !== signupForm.confirmPassword) {
-      setSignupError('Passwords do not match.');
-      return;
-    }
+    // Save name + phone into customer_profile, linked to the new user's ID
+    if (data.user) {
+      const { error: profileError } = await supabase.from('customer_profile').insert([
+        {
+          id: data.user.id,
+          full_name: signupForm.fullName.trim(),
+          phone: signupForm.phone.trim(),
+        },
+      ]);
 
-    try {
-      setIsSubmittingSignup(true);
-      const { error } = await supabase.auth.signUp({
-        email: signupForm.email.trim(),
-        password: signupForm.password,
-      });
-
-      if (error) {
-        throw error;
+      if (profileError) {
+        console.warn('Failed to save profile:', profileError.message);
       }
-
-      setSignupError('');
-      setSignupForm(initialSignupState);
-      setLoginForm((current) => ({ ...current, email: signupForm.email.trim() }));
-      setLoginError('Account created. Check your email to confirm your sign-up.');
-    } catch (error) {
-      setSignupError(getFriendlyMessage(error));
-    } finally {
-      setIsSubmittingSignup(false);
     }
-  };
+
+    setSignupForm(initialSignupState);
+    setLoginForm((current) => ({ ...current, email: signupForm.email.trim() }));
+    setMode('login');
+    setLoginError('Account created. Check your email to confirm your sign-up.');
+  } catch (error) {
+    setSignupError(getFriendlyMessage(error));
+  } finally {
+    setIsSubmittingSignup(false);
+  }
+};
 
   const handleGoogleLogin = async () => {
     setOauthLoading(true);
@@ -183,7 +200,7 @@ function AuthPage() {
     try {
       setIsSubmittingReset(true);
       const { error } = await supabase.auth.resetPasswordForEmail(resetForm.email.trim(), {
-        redirectTo: `${window.location.origin}/login`,
+       redirectTo: `${window.location.origin}/reset-password`,
       });
 
       if (error) {
@@ -201,142 +218,189 @@ function AuthPage() {
 
   return (
     <div className="auth-layout">
-      <section className="page-card auth-panel">
-        <p className="eyebrow">Welcome back</p>
-        <h1>Login to your account</h1>
 
-        <button
-          type="button"
-          className="auth-button google-button"
-          onClick={handleGoogleLogin}
-          disabled={oauthLoading}
-        >
-          {oauthLoading ? 'Connecting to Google...' : 'Continue with Google'}
-        </button>
+      {mode === 'login' && (
+        <section className="page-card auth-panel">
+          <p className="eyebrow">Welcome back</p>
+          <h1>Login to your account</h1>
 
-        <div className="auth-divider">
-          <span>or continue with email</span>
-        </div>
+          <button
+            type="button"
+            className="auth-button google-button"
+            onClick={handleGoogleLogin}
+            disabled={oauthLoading}
+          >
+            {oauthLoading ? 'Connecting to Google...' : 'Continue with Google'}
+          </button>
 
-        <form className="auth-form" onSubmit={handleLoginSubmit}>
-          <label className="field">
-            <span>Email</span>
-            <input
-              type="email"
-              value={loginForm.email}
-              onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))}
-              placeholder="you@example.com"
-              autoComplete="email"
-            />
-          </label>
-
-          <label className="field">
-            <span>Password</span>
-            <input
-              type="password"
-              value={loginForm.password}
-              onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
-              placeholder="Enter your password"
-              autoComplete="current-password"
-            />
-          </label>
-
-          {loginError && <p className="form-message error-message">{loginError}</p>}
-
-          <div className="auth-row auth-inline-row">
-            <button type="submit" className="header-button primary" disabled={!canSubmitLogin || isSubmittingLogin}>
-              {isSubmittingLogin ? 'Signing in...' : 'Login'}
-            </button>
-
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => {
-                setResetError('');
-                setResetSuccess('');
-                setResetForm({ email: loginForm.email || '' });
-              }}
-            >
-              Forgot password?
-            </button>
+          <div className="auth-divider">
+            <span>or continue with email</span>
           </div>
-        </form>
-      </section>
 
-      <section className="page-card auth-panel">
-        <p className="eyebrow">Create account</p>
-        <h2>Sign up</h2>
+          <form className="auth-form" onSubmit={handleLoginSubmit}>
+            
+            <label className="field">
+              <span>Email</span>
+              <input
+                type="email"
+                value={loginForm.email}
+                onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))}
+                placeholder="you@example.com"
+                autoComplete="email"
+              />
+            </label>
 
-        <form className="auth-form" onSubmit={handleSignupSubmit}>
-          <label className="field">
-            <span>Email</span>
-            <input
-              type="email"
-              value={signupForm.email}
-              onChange={(event) => setSignupForm((current) => ({ ...current, email: event.target.value }))}
-              placeholder="you@example.com"
-              autoComplete="email"
-            />
-          </label>
+            <label className="field">
+              <span>Password</span>
+              <input
+                type="password"
+                value={loginForm.password}
+                onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+              />
+            </label>
 
-          <label className="field">
-            <span>Password</span>
-            <input
-              type="password"
-              value={signupForm.password}
-              onChange={(event) => setSignupForm((current) => ({ ...current, password: event.target.value }))}
-              placeholder="Create a password"
-              autoComplete="new-password"
-            />
-          </label>
+            {loginError && <p className="form-message error-message">{loginError}</p>}
 
-          <label className="field">
-            <span>Confirm password</span>
-            <input
-              type="password"
-              value={signupForm.confirmPassword}
-              onChange={(event) => setSignupForm((current) => ({ ...current, confirmPassword: event.target.value }))}
-              placeholder="Confirm your password"
-              autoComplete="new-password"
-            />
-          </label>
+            <div className="auth-row auth-inline-row">
+              <button type="submit" className="header-button primary" disabled={!canSubmitLogin || isSubmittingLogin}>
+                {isSubmittingLogin ? 'Signing in...' : 'Login'}
+              </button>
 
-          {signupError && <p className="form-message error-message">{signupError}</p>}
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => {
+                  setResetError('');
+                  setResetSuccess('');
+                  setResetForm({ email: loginForm.email || '' });
+                  setMode('reset');
+                }}
+              >
+                Forgot password?
+              </button>
+            </div>
+          </form>
 
-          <button type="submit" className="header-button primary" disabled={!canSubmitSignup || isSubmittingSignup}>
-            {isSubmittingSignup ? 'Creating account...' : 'Create account'}
-          </button>
-        </form>
-      </section>
+          <p className="auth-footer-copy">
+            Don&apos;t have an account?{' '}
+            <button type="button" className="text-button" onClick={() => setMode('signup')}>
+              Sign up
+            </button>
+          </p>
+        </section>
+      )}
 
-      <section className="page-card auth-panel reset-panel">
-        <p className="eyebrow">Need help?</p>
-        <h2>Reset password</h2>
+      {mode === 'signup' && (
+        <section className="page-card auth-panel">
+          <p className="eyebrow">Create account</p>
+          <h2>Sign up</h2>
 
-        <form className="auth-form" onSubmit={handleResetPassword}>
-          <label className="field">
-            <span>Email</span>
-            <input
-              type="email"
-              value={resetForm.email}
-              onChange={(event) => setResetForm({ email: event.target.value })}
-              placeholder="Enter your email"
-              autoComplete="email"
-            />
-          </label>
+          <form className="auth-form" onSubmit={handleSignupSubmit}>
+            <label className="field">
+    <span>Full name</span>
+    <input
+      type="text"
+      value={signupForm.fullName}
+      onChange={(event) => setSignupForm((current) => ({ ...current, fullName: event.target.value }))}
+      placeholder="Your full name"
+      autoComplete="name"
+    />
+  </label>
 
-          {resetError && <p className="form-message error-message">{resetError}</p>}
-          {resetSuccess && <p className="form-message success-message">{resetSuccess}</p>}
+  <label className="field">
+    <span>Phone number</span>
+    <input
+      type="tel"
+      value={signupForm.phone}
+      onChange={(event) => setSignupForm((current) => ({ ...current, phone: event.target.value }))}
+      placeholder="03XX-XXXXXXX"
+      autoComplete="tel"
+    />
+  </label>
+            <label className="field">
+              <span>Email</span>
+              <input
+                type="email"
+                value={signupForm.email}
+                onChange={(event) => setSignupForm((current) => ({ ...current, email: event.target.value }))}
+                placeholder="you@example.com"
+                autoComplete="email"
+              />
+            </label>
 
-          <button type="submit" className="header-button secondary" disabled={!canSubmitReset || isSubmittingReset}>
-            {isSubmittingReset ? 'Sending reset email...' : 'Send reset email'}
-          </button>
-        </form>
+            <label className="field">
+              <span>Password</span>
+              <input
+                type="password"
+                value={signupForm.password}
+                onChange={(event) => setSignupForm((current) => ({ ...current, password: event.target.value }))}
+                placeholder="Create a password"
+                autoComplete="new-password"
+              />
+            </label>
 
-        <p className="auth-footer-copy">
-          Already have an account? <Link to="/login">Go back to login</Link>
-        </p>
-      </section>
+            <label className="field">
+              <span>Confirm password</span>
+              <input
+                type="password"
+                value={signupForm.confirmPassword}
+                onChange={(event) => setSignupForm((current) => ({ ...current, confirmPassword: event.target.value }))}
+                placeholder="Confirm your password"
+                autoComplete="new-password"
+              />
+            </label>
+
+            {signupError && <p className="form-message error-message">{signupError}</p>}
+
+            <button type="submit" className="header-button primary" disabled={!canSubmitSignup || isSubmittingSignup}>
+              {isSubmittingSignup ? 'Creating account...' : 'Create account'}
+            </button>
+          </form>
+
+          <p className="auth-footer-copy">
+            Already have an account?{' '}
+            <button type="button" className="text-button" onClick={() => setMode('login')}>
+              Login
+            </button>
+          </p>
+        </section>
+      )}
+
+      {mode === 'reset' && (
+        <section className="page-card auth-panel reset-panel">
+          <p className="eyebrow">Need help?</p>
+          <h2>Reset password</h2>
+
+          <form className="auth-form" onSubmit={handleResetPassword}>
+            <label className="field">
+              <span>Email</span>
+              <input
+                type="email"
+                value={resetForm.email}
+                onChange={(event) => setResetForm({ email: event.target.value })}
+                placeholder="Enter your email"
+                autoComplete="email"
+              />
+            </label>
+
+            {resetError && <p className="form-message error-message">{resetError}</p>}
+            {resetSuccess && <p className="form-message success-message">{resetSuccess}</p>}
+
+            <button type="submit" className="header-button secondary" disabled={!canSubmitReset || isSubmittingReset}>
+              {isSubmittingReset ? 'Sending reset email...' : 'Send reset email'}
+            </button>
+          </form>
+
+          <p className="auth-footer-copy">
+            Remembered your password?{' '}
+            <button type="button" className="text-button" onClick={() => setMode('login')}>
+              Go back to login
+            </button>
+          </p>
+        </section>
+      )}
     </div>
   );
 }

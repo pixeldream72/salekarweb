@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchQuotations } from '../services/supabaseService.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('en-PK', {
@@ -19,10 +20,13 @@ function formatDate(value) {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-  }).format(new Date(value));
+  }).format(new Date(Number(value)));
 }
 
 function MyQuotationsPage() {
+  const { session } = useAuth();
+  const customerId = session?.user?.id;
+
   const [quotations, setQuotations] = useState([]);
   const [source, setSource] = useState('loading');
 
@@ -30,7 +34,7 @@ function MyQuotationsPage() {
     let isMounted = true;
 
     const loadQuotations = async () => {
-      const result = await fetchQuotations('');
+      const result = await fetchQuotations(customerId);
 
       if (!isMounted) {
         return;
@@ -45,44 +49,40 @@ function MyQuotationsPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [customerId]);
 
   return (
     <section className="page-card">
       <p className="eyebrow">My Quotations</p>
       <h1>Quotations</h1>
-      <p>
-        Quotation history is private and requires an authenticated customer session. Public tenant pages do not expose order or quotation records.
-      </p>
-      <p>{source === 'private' ? 'Private quotation data is not available on this public storefront view.' : 'Quotation data unavailable.'}</p>
 
       <div className="quotation-list">
-        {quotations.length > 0 ? quotations.map((quotation) => (
-          <article key={quotation.id} className="quotation-card">
-            <div className="quotation-header">
-              <div>
-                <span className="quotation-id">{quotation.id}</span>
-                <h2>{quotation.customerName}</h2>
+        {quotations.length > 0 ? (
+          quotations.map((quotation) => (
+            <article key={quotation.id} className="quotation-card">
+              <div className="quotation-header">
+                <div>
+                  <span className="quotation-id">{quotation.quotation_no || quotation.id}</span>
+                  <h2>{quotation.customer_name}</h2>
+                </div>
+                <span className={`status-badge ${quotation.status}`}>{quotation.status}</span>
               </div>
-              <span className={`status-badge ${quotation.status}`}>{quotation.status}</span>
-            </div>
 
-            <div className="quotation-meta">
-              <span>Created: {formatDate(quotation.createdAt)}</span>
-              <span>Updated: {formatDate(quotation.updatedAt)}</span>
-            </div>
+              <div className="quotation-meta">
+                <span>Created: {formatDate(quotation.created_date)}</span>
+              </div>
 
-            <div className="quotation-summary">
-              <strong>{Array.isArray(quotation.items) ? quotation.items.length : 0} items</strong>
-              <strong>{formatCurrency(quotation.total || 0)}</strong>
-            </div>
+              <div className="quotation-summary">
+                <strong>{formatCurrency(quotation.total_amount || 0)}</strong>
+              </div>
 
-            <Link className="text-link" to={`/quotation/${quotation.id}`}>
-              View quotation
-            </Link>
-          </article>
-        )) : (
-          <p>No private quotation data is available from this public storefront view.</p>
+              <Link className="text-link" to={`/quotation/${quotation.id}`}>
+                View quotation
+              </Link>
+            </article>
+          ))
+        ) : (
+          <p>You have no quotations yet.</p>
         )}
       </div>
     </section>

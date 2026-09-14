@@ -14,7 +14,10 @@ export function TenantProvider({ children }) {
   const location = useLocation();
   const [tenant, setTenant] = useState(() => {
     const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-    const resolved = resolveTenant(hostname, '', location.pathname);
+    const pathShopOwnerId = extractShopOwnerIdFromPath(location.pathname);
+    const savedShopOwnerId = typeof window !== 'undefined' ? sessionStorage.getItem('shopOwnerId') : '';
+    const effectiveShopOwnerId = pathShopOwnerId || savedShopOwnerId || '';
+    const resolved = resolveTenant(hostname, effectiveShopOwnerId, location.pathname);
 
     return {
       ...resolved,
@@ -25,7 +28,18 @@ export function TenantProvider({ children }) {
 
   useEffect(() => {
     const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-    const resolved = resolveTenant(hostname, '', location.pathname);
+    const pathShopOwnerId = extractShopOwnerIdFromPath(location.pathname);
+
+    // If the path has a shop ID, remember it for this session
+    if (pathShopOwnerId && typeof window !== 'undefined') {
+      sessionStorage.setItem('shopOwnerId', pathShopOwnerId);
+    }
+
+    // Use the path ID if present, otherwise fall back to the last saved one
+    const savedShopOwnerId = typeof window !== 'undefined' ? sessionStorage.getItem('shopOwnerId') : '';
+    const effectiveShopOwnerId = pathShopOwnerId || savedShopOwnerId || '';
+
+    const resolved = resolveTenant(hostname, effectiveShopOwnerId, location.pathname);
     const isShopRoute = /^\/shop(?:\/|$)/i.test(location.pathname || '');
     const invalidShopRoute = isShopRoute && !hasValidShopOwnerId(location.pathname);
 
@@ -70,10 +84,10 @@ export function TenantProvider({ children }) {
 
       setTenant({
         ...resolved,
-        ...data,
+        ...(data || {}),
         shopOwnerId: resolved.shopOwnerId,
         source: resolved.source,
-        domain: data.domain || resolved.domain,
+        domain: (data && data.domain) || resolved.domain,
         isLoading: false,
         loadingMessage: null,
         isInvalidTenant: false,

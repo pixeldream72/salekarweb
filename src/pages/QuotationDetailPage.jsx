@@ -1,6 +1,8 @@
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { acceptQuotation, fetchQuotationById, rejectQuotation } from '../services/supabaseService.js';
+import { fetchQuotationById } from '../services/supabaseService.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
+import { useCart } from '../contexts/CartContext.jsx';
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('en-PK', {
@@ -11,32 +13,29 @@ function formatCurrency(value) {
 }
 
 function formatDate(value) {
-  if (!value) {
-    return 'Not available';
-  }
-
+  if (!value) return 'Not available';
   return new Intl.DateTimeFormat('en-GB', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-  }).format(new Date(value));
+  }).format(new Date(Number(value)));
 }
 
 function QuotationDetailPage() {
   const { id } = useParams();
+  const { session } = useAuth();
+  const { loadQuotationForEditing, loadQuotationForReorder } = useCart();
+  const navigate = useNavigate();
+  const customerId = session?.user?.id;
+
   const [quote, setQuote] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
 
     const loadQuote = async () => {
-      const result = await fetchQuotationById(id);
-
-      if (!isMounted) {
-        return;
-      }
-
+      const result = await fetchQuotationById(id, customerId);
+      if (!isMounted) return;
       setQuote(result.data);
     };
 
@@ -45,39 +44,7 @@ function QuotationDetailPage() {
     return () => {
       isMounted = false;
     };
-  }, [id]);
-
-  const handleAccept = async () => {
-    if (!id) {
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      await acceptQuotation(id);
-      const result = await fetchQuotationById(id);
-      setQuote(result.data);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleReject = async () => {
-    if (!id) {
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      await rejectQuotation(id);
-      const result = await fetchQuotationById(id);
-      setQuote(result.data);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  }, [id, customerId]);
 
   if (!quote) {
     return (
@@ -88,18 +55,22 @@ function QuotationDetailPage() {
     );
   }
 
-  const total = Array.isArray(quote.items)
-    ? quote.items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0)
-    : Number(quote.total || 0);
+  const isPending = quote.status === 'pending';
+
+  const handleEditInCart = () => {
+    loadQuotationForEditing(quote.id, quote.items);
+    navigate('/cart');
+  };
+
+  const handleReorder = () => {
+    loadQuotationForReorder(quote.items);
+    navigate('/cart');
+  };
 
   return (
     <section className="page-card">
       <p className="eyebrow">Quotation</p>
-      <h1>{quote.id}</h1>
-      <p>
-        This quotation is loaded from the SaleKar quotation source when available, and otherwise falls back to
-        the existing order-based demo data.
-      </p>
+      <h1>{quote.quotation_no || quote.id}</h1>
 
       <div className="quote-header-row">
         <span className={`status-badge ${quote.status}`}>{quote.status}</span>
@@ -111,16 +82,14 @@ function QuotationDetailPage() {
       <div className="info-grid">
         <div className="info-card">
           <h3>Customer</h3>
-          <p><strong>{quote.customerName}</strong></p>
-          <p>Order type: {quote.orderType}</p>
-          <p>Created: {formatDate(quote.createdAt)}</p>
-          <p>Updated: {formatDate(quote.updatedAt)}</p>
+          <p><strong>{quote.customer_name}</strong></p>
+          <p>Created: {formatDate(quote.created_date)}</p>
         </div>
 
         <div className="info-card">
           <h3>Summary</h3>
-          <p>Items: {Array.isArray(quote.items) ? quote.items.length : 0}</p>
-          <p>Total: {formatCurrency(total)}</p>
+          <p>Items: {quote.items.length}</p>
+          <p>Total: {formatCurrency(quote.total_amount)}</p>
           <p>Status: {quote.status}</p>
         </div>
       </div>
@@ -131,18 +100,20 @@ function QuotationDetailPage() {
           <thead>
             <tr>
               <th>Product</th>
+              <th>Color</th>
               <th>Qty</th>
-              <th>Unit Price</th>
+              <th>Rate</th>
               <th>Line Total</th>
             </tr>
           </thead>
           <tbody>
-            {Array.isArray(quote.items) && quote.items.map((item) => (
-              <tr key={`${quote.id}-${item.productName}`}>
-                <td>{item.productName}</td>
-                <td>{item.quantity}</td>
-                <td>{formatCurrency(item.unitPrice)}</td>
-                <td>{formatCurrency((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0))}</td>
+            {quote.items.map((item, index) => (
+              <tr key={`${quote.id}-${item.product_id}-${index}`}>
+                <td>{item.name}</td>
+                <td>{item.color}</td>
+                <td>{item.qty} {item.unit}</td>
+                <td>{formatCurrency(item.rate)}</td>
+                <td>{formatCurrency(item.qty * item.rate)}</td>
               </tr>
             ))}
           </tbody>
@@ -150,20 +121,21 @@ function QuotationDetailPage() {
       </div>
 
       <div className="quote-notes">
-        <h3>Notes</h3>
-        <p>{quote.notes || 'No notes available.'}</p>
+        <h3>Remarks</h3>
+        <p>{quote.remarks || 'No remarks.'}</p>
       </div>
 
-      {quote.status === 'pending' && (
-        <div className="quote-actions" style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
-          <button type="button" className="header-button secondary" disabled={isSubmitting} onClick={handleReject}>
-            Reject
+      <div style={{ marginTop: '1.5rem' }}>
+        {isPending ? (
+          <button type="button" className="header-button primary" onClick={handleEditInCart}>
+            Edit in Cart
           </button>
-          <button type="button" className="header-button primary" disabled={isSubmitting} onClick={handleAccept}>
-            Accept
+        ) : (
+          <button type="button" className="header-button primary" onClick={handleReorder}>
+            Order Again
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </section>
   );
 }

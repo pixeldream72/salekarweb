@@ -6,7 +6,6 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 import AppLayout from './layouts/AppLayout.jsx';
 import HomePage from './pages/HomePage.jsx';
 import ProductsPage from './pages/ProductsPage.jsx';
-import CategoriesPage from './pages/CategoriesPage.jsx';
 import AboutPage from './pages/AboutPage.jsx';
 import ContactPage from './pages/ContactPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
@@ -17,23 +16,28 @@ import QuotationDetailPage from './pages/QuotationDetailPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import ShopNotFoundPage from './pages/ShopNotFoundPage.jsx';
+import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
+import { CartProvider } from './contexts/CartContext.jsx';
+import CartPage from './pages/CartPage.jsx';
 
 function App() {
   return (
     <AuthProvider>
       <TenantProvider>
+        <CartProvider>
         <Routes>
           <Route element={<AppLayout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/shop/:shopOwnerId" element={<HomePage />} />
             <Route path="/shop" element={<ShopNotFoundPage />} />
             <Route path="/products" element={<ProductsPage />} />
-            <Route path="/categories" element={<CategoriesPage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/cart" element={<CartPage />} />
             <Route
               path="/my-quotations"
               element={
@@ -61,6 +65,7 @@ function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
+        </CartProvider>
       </TenantProvider>
     </AuthProvider>
   );

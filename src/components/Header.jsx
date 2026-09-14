@@ -1,11 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useTenant } from '../contexts/TenantContext.jsx';
+import { useCart } from '../contexts/CartContext.jsx';
 
 const navItems = [
   { label: 'Home', to: '/' },
   { label: 'Products', to: '/products' },
-  { label: 'Categories', to: '/categories' },
   { label: 'About', to: '/about' },
   { label: 'Contact', to: '/contact' },
   { label: 'My Quotations', to: '/my-quotations' },
@@ -16,6 +16,7 @@ function Header() {
   const tenant = useTenant();
   const navigate = useNavigate();
   const { session, signOut, user } = useAuth();
+  const { totalItems } = useCart();
 
   const handleLogout = async () => {
     try {
@@ -48,6 +49,25 @@ function Header() {
       </nav>
 
       <div className="nav-actions">
+        <NavLink to="/cart" className="header-button secondary" style={{ position: 'relative' }}>
+          Cart
+          {totalItems > 0 && (
+            <span
+              style={{
+                marginLeft: '0.4rem',
+                backgroundColor: '#dc2626',
+                color: 'white',
+                borderRadius: '999px',
+                padding: '0.1rem 0.5rem',
+                fontSize: '0.75rem',
+                fontWeight: 'bold',
+              }}
+            >
+              {totalItems}
+            </span>
+          )}
+        </NavLink>
+
         {session ? (
           <>
             <span className="user-badge">{user?.email ? user.email.split('@')[0] : 'Account'}</span>

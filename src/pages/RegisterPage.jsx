@@ -1,7 +1,7 @@
 import AuthPage from './AuthPage.jsx';
 
 function RegisterPage() {
-  return <AuthPage />;
+  return <AuthPage initialMode="signup" />;
 }
 
 export default RegisterPage;
