@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useTenant } from '../contexts/TenantContext.jsx';
@@ -17,38 +18,44 @@ function Header() {
   const navigate = useNavigate();
   const { session, signOut, user } = useAuth();
   const { totalItems } = useCart();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
       await signOut();
       navigate('/login', { replace: true });
+      setIsMenuOpen(false);
     } catch (error) {
       console.error('Failed to sign out:', error);
     }
   };
 
-  return (
+  const closeMenu = () => setIsMenuOpen(false);
+
+return (
     <header className="topbar">
-      <div className="brand-wrap">
-        <div className="brand-mark">S</div>
-        <div>
-          <strong>{tenant.businessName}</strong>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <button
+          type="button"
+          className="hamburger-button"
+          onClick={() => setIsMenuOpen((current) => !current)}
+          aria-label="Toggle menu"
+        >
+          {isMenuOpen ? '✕' : '☰'}
+        </button>
+
+        <div className="brand-wrap">
+          <div>
+            <strong>{tenant.businessName}</strong>
+          </div>
         </div>
-      </div>
 
-      <nav className="main-nav" aria-label="Main navigation">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
-          >
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
+        {session && (
+          <span className="user-badge">
+            {user?.email ? user.email.split('@')[0] : 'Account'}
+          </span>
+        )}
 
-      <div className="nav-actions">
         <NavLink to="/cart" className="header-button secondary" style={{ position: 'relative' }}>
           Cart
           {totalItems > 0 && (
@@ -67,25 +74,35 @@ function Header() {
             </span>
           )}
         </NavLink>
+      </div>
+
+      <nav className={`main-nav ${isMenuOpen ? 'nav-open' : ''}`} aria-label="Main navigation">
+        {navItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            onClick={closeMenu}
+            className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
+          >
+            {item.label}
+          </NavLink>
+        ))}
 
         {session ? (
-          <>
-            <span className="user-badge">{user?.email ? user.email.split('@')[0] : 'Account'}</span>
-            <button type="button" className="header-button secondary" onClick={handleLogout}>
-              Logout
-            </button>
-          </>
+          <button type="button" className="header-button secondary" onClick={handleLogout}>
+            Logout
+          </button>
         ) : (
           <>
-            <NavLink to="/login" className="header-button secondary">
+            <NavLink to="/login" className="header-button primary" onClick={closeMenu}>
               Login
             </NavLink>
-            <NavLink to="/register" className="header-button primary">
+            <NavLink to="/register" className="header-button primary" onClick={closeMenu}>
               Register
             </NavLink>
           </>
         )}
-      </div>
+      </nav>
     </header>
   );
 }

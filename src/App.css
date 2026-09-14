@@ -516,15 +516,5 @@
   flex-wrap: wrap;
 }
 
-@media (max-width: 900px) {
-  .topbar {
-    flex-direction: column;
-    align-items: flex-start;
-  }
 
-  .main-nav,
-  .nav-actions {
-    width: 100%;
-  }
-}
 
