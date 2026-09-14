@@ -105,7 +105,7 @@ function CartPage() {
       <p className="eyebrow">Cart</p>
       <h1>{cartMode === 'editing' ? 'Editing your quotation' : 'Review your quote'}</h1>
 
-      <Link to="/products" className="header-button secondary" style={{ display: 'inline-block', marginBottom: '1.5rem' }}>
+      <Link to="/products" className="header-button primary" style={{ display: 'inline-block', marginBottom: '1.5rem' }}>
         + Add More Products
       </Link>
 

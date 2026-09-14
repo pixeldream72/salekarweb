@@ -62,6 +62,7 @@ function VariantRow({ variant }) {
 
     return (
     <div
+      className="variant-row"
       style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -72,10 +73,10 @@ function VariantRow({ variant }) {
         flexWrap: 'wrap',
       }}
     >
-      <span style={{ minWidth: '80px' }}>{variant.color || 'Default'}</span>
-      <span style={{ minWidth: '80px' }}>PKR {variant.price}</span>
+      <span className="variant-color" style={{ minWidth: '80px' }}>{variant.color || 'Default'}</span>
+      <span className="variant-price" style={{ minWidth: '80px' }}>PKR {variant.price}</span>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div className="variant-controls" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <button type="button" onClick={handleDecrease} style={{ width: '32px' }}>-</button>
         <input
           type="number"
@@ -85,15 +86,15 @@ function VariantRow({ variant }) {
           style={{ width: '50px', textAlign: 'center' }}
         />
         <button type="button" onClick={handleIncrease} style={{ width: '32px' }}>+</button>
-        <span style={{ color: '#64748b' }}>{variant.unit}</span>
+        <span className="variant-unit" style={{ color: '#64748b' }}>{variant.unit}</span>
       </div>
 
       <button type="button" className="header-button primary" onClick={handleAdd}>
-        Add to Quote
+        Add to Cart
       </button>
 
       {quantityInCart > 0 && (
-        <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✓ {quantityInCart} in cart</span>
+        <span className="cart-count-pill" style={{ color: '#16a34a', fontWeight: 'bold' }}>✓ {quantityInCart} in cart</span>
       )}
     </div>
   );
@@ -150,13 +151,14 @@ function ProductsPage() {
 
       <input
         type="text"
+        className="product-search"
         placeholder="Search by name, item code, or color..."
         value={searchTerm}
         onChange={(event) => setSearchTerm(event.target.value)}
         style={{ width: '100%', padding: '0.75rem', marginBottom: '1rem', fontSize: '1rem' }}
       />
 
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+      <div className="category-row" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         {categories.map((category) => (
           <button
             key={category}
@@ -180,18 +182,19 @@ function ProductsPage() {
         <p style={{ marginTop: '1rem', color: '#64748b' }}>No products match your search.</p>
       ) : (
        groupedProducts.map((group) => (
-  <div key={group.itemCode} style={{ marginBottom: '2rem' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+  <div key={group.itemCode} className="product-group" style={{ marginBottom: '2rem' }}>
+    <div className="product-group-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
       {group.imageUrl ? (
         <img
+          className="product-group-image"
           src={group.imageUrl}
           alt={group.name}
           style={{ width: '72px', height: '72px', objectFit: 'cover', borderRadius: '6px' }}
         />
       ) : (
-        <div style={{ width: '48px', height: '48px', backgroundColor: '#e2e8f0', borderRadius: '6px' }} />
+        <div className="product-group-image product-group-image-placeholder" style={{ width: '48px', height: '48px', backgroundColor: '#e2e8f0', borderRadius: '6px' }} />
       )}
-      <h3 style={{ margin: 0 }}>
+      <h3 className="product-group-title" style={{ margin: 0 }}>
         {group.name} <small style={{ color: '#64748b' }}>({group.itemCode})</small>
       </h3>
     </div>

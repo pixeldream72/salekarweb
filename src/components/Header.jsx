@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useTenant } from '../contexts/TenantContext.jsx';
 import { useCart } from '../contexts/CartContext.jsx';
+import { supabase } from '../services/supabaseClient.js';
 
 const navItems = [
   { label: 'Home', to: '/' },
@@ -10,7 +11,6 @@ const navItems = [
   { label: 'About', to: '/about' },
   { label: 'Contact', to: '/contact' },
   { label: 'My Quotations', to: '/my-quotations' },
-  { label: 'Profile', to: '/profile' },
 ];
 
 function Header() {
@@ -19,6 +19,47 @@ function Header() {
   const { session, signOut, user } = useAuth();
   const { totalItems } = useCart();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [displayName, setDisplayName] = useState('Account');
+
+  useEffect(() => {
+    const userId = session?.user?.id;
+
+    if (!userId) {
+      setDisplayName('Account');
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadProfileName = async () => {
+      const { data, error } = await supabase
+        .from('customer_profile')
+        .select('full_name')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (error) {
+        console.warn('Failed to load customer profile for header:', error.message);
+      }
+
+      const nextName = data?.full_name?.trim()
+        || user?.user_metadata?.full_name
+        || session?.user?.email?.split('@')[0]
+        || 'Account';
+
+      setDisplayName(nextName);
+    };
+
+    loadProfileName();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [session, user]);
 
   const handleLogout = async () => {
     try {
@@ -32,7 +73,7 @@ function Header() {
 
   const closeMenu = () => setIsMenuOpen(false);
 
-return (
+  return (
     <header className="topbar">
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <button
@@ -51,9 +92,9 @@ return (
         </div>
 
         {session && (
-          <span className="user-badge">
-            {user?.email ? user.email.split('@')[0] : 'Account'}
-          </span>
+          <NavLink to="/profile" className="user-badge" onClick={closeMenu}>
+            {displayName}
+          </NavLink>
         )}
 
         <NavLink to="/cart" className="header-button secondary" style={{ position: 'relative' }}>
