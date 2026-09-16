@@ -5,21 +5,55 @@ import { useTenant } from '../contexts/TenantContext.jsx';
 import { useCart } from '../contexts/CartContext.jsx';
 import { supabase } from '../services/supabaseClient.js';
 
-const navItems = [
-  { label: 'Home', to: '/' },
-  { label: 'Products', to: '/products' },
-  { label: 'About', to: '/about' },
-  { label: 'Contact', to: '/contact' },
-  { label: 'My Quotations', to: '/my-quotations' },
-];
-
 function Header() {
   const tenant = useTenant();
   const navigate = useNavigate();
+
   const { session, signOut, user } = useAuth();
   const { totalItems } = useCart();
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [displayName, setDisplayName] = useState('Account');
+
+  /*
+   * Tenant-aware base path
+   *
+   * Local/testing:
+   * /shop/UUID
+   *
+   * Custom domain:
+   * /
+   */
+  const tenantBasePath = tenant?.shopOwnerId
+    ? `/shop/${tenant.shopOwnerId}`
+    : '';
+
+  const getTenantPath = (path = '') => {
+    if (!tenantBasePath) {
+      return path || '/';
+    }
+
+    if (!path || path === '/') {
+      return tenantBasePath;
+    }
+
+    return `${tenantBasePath}${path}`;
+  };
+
+  const navItems = [
+    { label: 'Home', to: getTenantPath('/') },
+    { label: 'Products', to: getTenantPath('/products') },
+    { label: 'About', to: getTenantPath('/about') },
+    { label: 'Contact', to: getTenantPath('/contact') },
+    ...(session
+      ? [
+          {
+            label: 'My Quotations',
+            to: getTenantPath('/my-quotations'),
+          },
+        ]
+      : []),
+  ];
 
   useEffect(() => {
     const userId = session?.user?.id;
@@ -43,13 +77,17 @@ function Header() {
       }
 
       if (error) {
-        console.warn('Failed to load customer profile for header:', error.message);
+        console.warn(
+          'Failed to load customer profile for header:',
+          error.message
+        );
       }
 
-      const nextName = data?.full_name?.trim()
-        || user?.user_metadata?.full_name
-        || session?.user?.email?.split('@')[0]
-        || 'Account';
+      const nextName =
+        data?.full_name?.trim() ||
+        user?.user_metadata?.full_name ||
+        session?.user?.email?.split('@')[0] ||
+        'Account';
 
       setDisplayName(nextName);
     };
@@ -64,22 +102,36 @@ function Header() {
   const handleLogout = async () => {
     try {
       await signOut();
-      navigate('/login', { replace: true });
+
+      navigate(getTenantPath('/login'), {
+        replace: true,
+      });
+
       setIsMenuOpen(false);
     } catch (error) {
       console.error('Failed to sign out:', error);
     }
   };
 
-  const closeMenu = () => setIsMenuOpen(false);
+  const closeMenu = () => {
+    setIsMenuOpen(false);
+  };
 
   return (
     <header className="topbar">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+        }}
+      >
         <button
           type="button"
           className="hamburger-button"
-          onClick={() => setIsMenuOpen((current) => !current)}
+          onClick={() =>
+            setIsMenuOpen((current) => !current)
+          }
           aria-label="Toggle menu"
         >
           {isMenuOpen ? '✕' : '☰'}
@@ -92,13 +144,23 @@ function Header() {
         </div>
 
         {session && (
-          <NavLink to="/profile" className="user-badge" onClick={closeMenu}>
+          <NavLink
+            to={getTenantPath('/profile')}
+            className="user-badge"
+            onClick={closeMenu}
+          >
             {displayName}
           </NavLink>
         )}
 
-        <NavLink to="/cart" className="header-button secondary" style={{ position: 'relative' }}>
+        <NavLink
+          to={getTenantPath('/cart')}
+          className="header-button secondary"
+          style={{ position: 'relative' }}
+          onClick={closeMenu}
+        >
           Cart
+
           {totalItems > 0 && (
             <span
               style={{
@@ -117,28 +179,50 @@ function Header() {
         </NavLink>
       </div>
 
-      <nav className={`main-nav ${isMenuOpen ? 'nav-open' : ''}`} aria-label="Main navigation">
+      <nav
+        className={`main-nav ${
+          isMenuOpen ? 'nav-open' : ''
+        }`}
+        aria-label="Main navigation"
+      >
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             onClick={closeMenu}
-            className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
+            className={({ isActive }) =>
+              isActive
+                ? 'nav-link active'
+                : 'nav-link'
+            }
           >
             {item.label}
           </NavLink>
         ))}
 
         {session ? (
-          <button type="button" className="header-button secondary" onClick={handleLogout}>
+          <button
+            type="button"
+            className="header-button secondary"
+            onClick={handleLogout}
+          >
             Logout
           </button>
         ) : (
           <>
-            <NavLink to="/login" className="header-button primary" onClick={closeMenu}>
+            <NavLink
+              to={getTenantPath('/login')}
+              className="header-button primary"
+              onClick={closeMenu}
+            >
               Login
             </NavLink>
-            <NavLink to="/register" className="header-button primary" onClick={closeMenu}>
+
+            <NavLink
+              to={getTenantPath('/register')}
+              className="header-button primary"
+              onClick={closeMenu}
+            >
               Register
             </NavLink>
           </>

@@ -1,126 +1,279 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
 import { useLocation } from 'react-router-dom';
+
 import {
   fetchBusinessDetail,
   isValidUuid,
   resolveShopOwnerIdBySlug,
   resolveShopOwnerIdBySlugOrDomain,
 } from '../services/supabaseService.js';
-import { extractShopOwnerIdFromPath, resolveTenant } from '../services/tenantResolver.js';
+
+import {
+  extractShopOwnerIdFromPath,
+} from '../services/tenantResolver.js';
 
 const TenantContext = createContext(null);
 
+const EMPTY_TENANT = {
+  shopOwnerId: null,
+  source: null,
+  domain: '',
+  businessName: '',
+  businessType: '',
+  isLoading: true,
+  loadingMessage: 'Resolving tenant...',
+  isInvalidTenant: false,
+};
+
 export function TenantProvider({ children }) {
   const location = useLocation();
-  const [tenant, setTenant] = useState({
-    shopOwnerId: null,
-    isLoading: true,
-    loadingMessage: 'Resolving tenant...',
-    isInvalidTenant: false,
-  });
+
+  const [tenant, setTenant] = useState(EMPTY_TENANT);
 
   useEffect(() => {
     let isActive = true;
 
     const resolveEverything = async () => {
-      setTenant((current) => ({
-        ...current,
-        isLoading: true,
-        loadingMessage: 'Resolving tenant...',
-      }));
+      const hostname =
+        typeof window !== 'undefined'
+          ? window.location.hostname
+          : '';
 
-      const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-      const pathSegment = extractShopOwnerIdFromPath(location.pathname);
-      const isShopRoute = /^\/shop(?:\/|$)/i.test(location.pathname || '');
+      const pathname = location.pathname || '';
 
-      let resolvedShopOwnerId = null;
-      let source = 'default';
+      console.log('--------------------------------');
+      console.log('TENANT RESOLUTION START');
+      console.log('Hostname:', hostname);
+      console.log('Pathname:', pathname);
 
-      if (pathSegment) {
-        if (isValidUuid(pathSegment)) {
-          // Path segment IS a valid UUID — use it directly
-          resolvedShopOwnerId = pathSegment;
-          source = 'path-uuid';
-        } else {
-  // Path segment is a SLUG — look it up
-  console.log('Path segment (not UUID):', pathSegment); // TEMP DEBUG
-  resolvedShopOwnerId = await resolveShopOwnerIdBySlug(pathSegment);
-  console.log('Resolved shopOwnerId from slug:', resolvedShopOwnerId); // TEMP DEBUG
-  source = 'path-slug';
-}
-      } else {
-        // No path segment — try domain/subdomain resolution
-        const domainResolved = await resolveShopOwnerIdBySlugOrDomain(hostname);
-
-        if (domainResolved) {
-          resolvedShopOwnerId = domainResolved;
-          source = 'domain';
-        } else {
-          // Fallback: previously saved shop in this browser session
-          const saved = typeof window !== 'undefined' ? sessionStorage.getItem('shopOwnerId') : '';
-          if (saved) {
-            resolvedShopOwnerId = saved;
-            source = 'session';
-          }
-        }
+      if (isActive) {
+        setTenant({
+          ...EMPTY_TENANT,
+          domain: hostname,
+          isLoading: true,
+          loadingMessage: 'Resolving tenant...',
+        });
       }
 
-      if (!isActive) return;
+      try {
+        /*
+         * -----------------------------------------
+         * 1. Resolve tenant from URL path
+         * -----------------------------------------
+         */
 
-      // If this was a /shop/ route but resolution failed, show "not found"
-      if (isShopRoute && !resolvedShopOwnerId) {
+        const pathSegment = extractShopOwnerIdFromPath(pathname);
+
+        let resolvedShopOwnerId = null;
+        let source = null;
+
+        if (pathSegment) {
+          console.log('Path tenant:', pathSegment);
+
+          if (isValidUuid(pathSegment)) {
+            resolvedShopOwnerId = pathSegment;
+            source = 'path-uuid';
+
+            console.log(
+              'Using UUID from path:',
+              resolvedShopOwnerId
+            );
+          } else {
+            console.log(
+              'Path is slug. Resolving slug:',
+              pathSegment
+            );
+
+            resolvedShopOwnerId =
+              await resolveShopOwnerIdBySlug(pathSegment);
+
+            source = 'path-slug';
+
+            console.log(
+              'Resolved slug → shopOwnerId:',
+              resolvedShopOwnerId
+            );
+          }
+        }
+
+        /*
+         * -----------------------------------------
+         * 2. If no path tenant, resolve hostname
+         * -----------------------------------------
+         */
+
+        if (!resolvedShopOwnerId) {
+          console.log(
+            'No path tenant. Resolving hostname:',
+            hostname
+          );
+
+          resolvedShopOwnerId =
+            await resolveShopOwnerIdBySlugOrDomain(hostname);
+
+          if (resolvedShopOwnerId) {
+            source = 'domain';
+
+            console.log(
+              'Resolved domain → shopOwnerId:',
+              resolvedShopOwnerId
+            );
+          }
+        }
+
+        /*
+         * -----------------------------------------
+         * 3. Tenant NOT FOUND
+         * -----------------------------------------
+         */
+
+        if (!resolvedShopOwnerId) {
+          console.warn(
+            'TENANT NOT FOUND',
+            {
+              hostname,
+              pathname,
+              pathSegment,
+            }
+          );
+
+          if (!isActive) return;
+
+          setTenant({
+            shopOwnerId: null,
+            source: source || 'not-found',
+            domain: hostname,
+            businessName: 'Shop not found',
+            businessType: 'Unavailable',
+            isLoading: false,
+            loadingMessage: null,
+            isInvalidTenant: true,
+          });
+
+          return;
+        }
+
+        /*
+         * -----------------------------------------
+         * 4. Tenant ID resolved
+         * -----------------------------------------
+         */
+
+        if (!isActive) return;
+
+        setTenant({
+          ...EMPTY_TENANT,
+          shopOwnerId: resolvedShopOwnerId,
+          source,
+          domain: hostname,
+          isLoading: true,
+          loadingMessage: 'Loading business information...',
+          isInvalidTenant: false,
+        });
+
+        console.log(
+          'Fetching BusinessDetail:',
+          resolvedShopOwnerId
+        );
+
+        /*
+         * -----------------------------------------
+         * 5. Load BusinessDetail
+         * -----------------------------------------
+         */
+
+        const { data, error } =
+          await fetchBusinessDetail(resolvedShopOwnerId);
+
+        if (!isActive) return;
+
+        if (error) {
+          console.error(
+            'BusinessDetail fetch error:',
+            error
+          );
+
+          setTenant({
+            shopOwnerId: null,
+            source: 'business-detail-error',
+            domain: hostname,
+            businessName: 'Shop not found',
+            businessType: 'Unavailable',
+            isLoading: false,
+            loadingMessage: null,
+            isInvalidTenant: true,
+          });
+
+          return;
+        }
+
+        if (!data) {
+          console.warn(
+            'No BusinessDetail found for:',
+            resolvedShopOwnerId
+          );
+
+          setTenant({
+            shopOwnerId: null,
+            source: 'business-detail-not-found',
+            domain: hostname,
+            businessName: 'Shop not found',
+            businessType: 'Unavailable',
+            isLoading: false,
+            loadingMessage: null,
+            isInvalidTenant: true,
+          });
+
+          return;
+        }
+
+        /*
+         * -----------------------------------------
+         * 6. Tenant successfully loaded
+         * -----------------------------------------
+         */
+
+        console.log(
+          'TENANT LOADED:',
+          data.businessName
+        );
+
+        setTenant({
+          ...data,
+          shopOwnerId: resolvedShopOwnerId,
+          source,
+          domain: hostname,
+          isLoading: false,
+          loadingMessage: null,
+          isInvalidTenant: false,
+        });
+
+      } catch (error) {
+        console.error(
+          'Tenant resolution failed:',
+          error
+        );
+
+        if (!isActive) return;
+
         setTenant({
           shopOwnerId: null,
-          source: 'path',
-          domain: hostname || 'localhost',
+          source: 'error',
+          domain: hostname,
           businessName: 'Shop not found',
           businessType: 'Unavailable',
           isLoading: false,
           loadingMessage: null,
           isInvalidTenant: true,
         });
-        return;
       }
-
-      if (!resolvedShopOwnerId) {
-        // No tenant resolvable at all — fall back to default/mock tenant
-        const fallback = resolveTenant(hostname, '', location.pathname);
-        setTenant({
-          ...fallback,
-          isLoading: false,
-          loadingMessage: null,
-          isInvalidTenant: false,
-        });
-        return;
-      }
-
-      // Remember this shop for the rest of the browsing session
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('shopOwnerId', resolvedShopOwnerId);
-      }
-
-      setTenant((current) => ({
-        ...current,
-        shopOwnerId: resolvedShopOwnerId,
-        source,
-        isLoading: true,
-        loadingMessage: 'Loading business information...',
-        isInvalidTenant: false,
-      }));
-
-      const { data } = await fetchBusinessDetail(resolvedShopOwnerId);
-
-      if (!isActive) return;
-
-      setTenant({
-        ...(data || {}),
-        shopOwnerId: resolvedShopOwnerId,
-        source,
-        domain: hostname,
-        isLoading: false,
-        loadingMessage: null,
-        isInvalidTenant: false,
-      });
     };
 
     void resolveEverything();
@@ -130,16 +283,25 @@ export function TenantProvider({ children }) {
     };
   }, [location.pathname]);
 
-  const value = useMemo(() => tenant, [tenant]);
+  const value = useMemo(
+    () => tenant,
+    [tenant]
+  );
 
-  return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;
+  return (
+    <TenantContext.Provider value={value}>
+      {children}
+    </TenantContext.Provider>
+  );
 }
 
 export function useTenant() {
   const context = useContext(TenantContext);
 
   if (!context) {
-    throw new Error('useTenant must be used within a TenantProvider');
+    throw new Error(
+      'useTenant must be used within a TenantProvider'
+    );
   }
 
   return context;
