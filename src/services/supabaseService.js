@@ -15,6 +15,31 @@ export const mockCategories = [
   { id: 3, name: 'Wholesale Goods' },
 ];
 
+export async function getShopOwnerIdBySlug(slug) {
+  if (!slug) {
+    return null;
+  }
+
+  const cleanSlug = slug.trim().toLowerCase();
+
+  const { data, error } = await supabase
+    .from('BusinessDetail')
+    .select('shop_owner_id')
+    .eq('website_slug', cleanSlug)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Failed to resolve shop owner by slug:', error);
+    throw error;
+  }
+
+  if (!data?.shop_owner_id) {
+    console.warn('No tenant found for slug:', cleanSlug);
+    return null;
+  }
+
+  return data.shop_owner_id;
+}
 function pickFirstDefined(record, keys, fallback = '') {
   if (!record || typeof record !== 'object') {
     return fallback;
@@ -539,20 +564,4 @@ export function isValidUuid(value) {
   return Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
 }
 
-export async function resolveShopOwnerIdBySlug(slug) {
-  console.log('resolveShopOwnerIdBySlug called with:', slug); // TEMP DEBUG
-
-  if (!slug) return null;
-
-  const { data, error } = await supabase
-    .from('BusinessDetail')
-    .select('shop_owner_id')
-    .eq('website_slug', slug)
-    .limit(1)
-    .maybeSingle();
-
-  console.log('resolveShopOwnerIdBySlug result:', data, error); // TEMP DEBUG
-
-  return data?.shop_owner_id || null;
-}
 

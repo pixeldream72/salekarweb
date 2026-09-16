@@ -1,32 +1,32 @@
 import { useEffect, useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useTenant } from '../contexts/TenantContext.jsx';
 import { useCart } from '../contexts/CartContext.jsx';
 import { supabase } from '../services/supabaseClient.js';
+import {NavLink,useLocation,useNavigate,} from 'react-router-dom';
 
 function Header() {
   const tenant = useTenant();
   const navigate = useNavigate();
 
+
+const location = useLocation();
   const { session, signOut, user } = useAuth();
   const { totalItems } = useCart();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [displayName, setDisplayName] = useState('Account');
 
-  /*
-   * Tenant-aware base path
-   *
-   * Local/testing:
-   * /shop/UUID
-   *
-   * Custom domain:
-   * /
-   */
-  const tenantBasePath = tenant?.shopOwnerId
-    ? `/shop/${tenant.shopOwnerId}`
-    : '';
+ const shopMatch = location.pathname.match(
+  /^\/shop\/([^/]+)/i
+);
+
+const tenantSlug = shopMatch?.[1] || '';
+
+    const tenantBasePath = tenantSlug
+  ? `/shop/${tenantSlug}`
+  : '';
+
 
   const getTenantPath = (path = '') => {
     if (!tenantBasePath) {

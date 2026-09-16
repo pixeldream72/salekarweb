@@ -11,7 +11,7 @@ import { useLocation } from 'react-router-dom';
 import {
   fetchBusinessDetail,
   isValidUuid,
-  resolveShopOwnerIdBySlug,
+  getShopOwnerIdBySlug,
   resolveShopOwnerIdBySlugOrDomain,
 } from '../services/supabaseService.js';
 
@@ -92,7 +92,7 @@ export function TenantProvider({ children }) {
             );
 
             resolvedShopOwnerId =
-              await resolveShopOwnerIdBySlug(pathSegment);
+              await getShopOwnerIdBySlug(pathSegment);
 
             source = 'path-slug';
 
