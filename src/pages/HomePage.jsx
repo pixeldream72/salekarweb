@@ -71,6 +71,11 @@ function HomePage() {
           </p>
           <h1 style={{ margin: '0.2rem 0 0', lineHeight: 1.2, fontSize: '1.75rem' }}>
             {tenant.businessName}
+            {tenant.slogan && (
+              <span style={{ display: 'block', fontSize: '0.9rem', color: '#64748b', marginTop: '0.2rem' }}>
+                {tenant.slogan}
+              </span>
+            )}
           </h1>
         </div>
       </section>
@@ -79,7 +84,8 @@ function HomePage() {
       <section className="page-card" style={{ textAlign: 'center', padding: '2rem 1.5rem' }}>
         <h2 style={{ marginTop: 0 }}>Browse our catalog and request a quote</h2>
         <p style={{ color: '#64748b', maxWidth: '480px', margin: '0.5rem auto 1.5rem' }}>
-          Explore wholesale-ready products, build your quotation, and we'll get back to you fast.
+          {tenant.what_we_offer || 'Explore wholesale-ready products, build your quotation, and we\'ll get back to you fast.'}
+        
         </p>
         <Link to="/products" className="header-button primary" style={{ display: 'inline-block' }}>
           Browse Products
@@ -121,17 +127,30 @@ function HomePage() {
       </section>
 
       {/* Contact info */}
-      {(tenant.phone || tenant.address) && (
-        <section className="page-card" style={{ padding: '1.5rem' }}>
-          <h3 style={{ marginTop: 0 }}>Get in touch</h3>
-          {tenant.phone && <p style={{ margin: '0.3rem 0' }}>📞 {tenant.phone}</p>}
-          {tenant.address && (
-            <p style={{ margin: '0.3rem 0' }}>
-              📍 {tenant.address}{tenant.city ? `, ${tenant.city}` : ''}
-            </p>
-          )}
-        </section>
-      )}
+      {/* Contact info */}
+  {((tenant.contactList && tenant.contactList.length > 0) || tenant.address || tenant.ownerName) && (
+  <section className="page-card" style={{ padding: '1.5rem' }}>
+    <h3 style={{ marginTop: 0 }}>Get in touch</h3>
+
+    {tenant.contactList && tenant.contactList.map((contact, index) => (
+      <p key={index} style={{ margin: '0.3rem 0' }}>
+        📞 {contact.title ? `${contact.title}: ` : ''}{contact.number}
+      </p>
+    ))}
+
+    {tenant.address && (
+      <p style={{ margin: '0.3rem 0' }}>
+        📍 {tenant.address}{tenant.city ? `, ${tenant.city}` : ''}
+      </p>
+    )}
+
+    {tenant.ownerName && (
+      <p style={{ margin: '0.3rem 0', color: '#64748b', fontSize: '0.9rem' }}>
+        Owner: {tenant.ownerName}
+      </p>
+    )}
+  </section>
+)}
     </div>
   );
 }

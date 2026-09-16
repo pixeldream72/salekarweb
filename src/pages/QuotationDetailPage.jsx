@@ -111,8 +111,11 @@ function QuotationDetailPage() {
               <tr key={`${quote.id}-${item.product_id}-${index}`}>
                 <td>{item.name}</td>
                 <td>{item.color}</td>
-                <td>{item.qty} {item.unit}</td>
-                <td>{formatCurrency(item.rate)}</td>
+                <td>{item.qty}</td>
+                <td>
+                  {formatCurrency(item.rate)}
+                  {item.unit ? <span style={{ marginLeft: '0.2rem', color: '#64748b' }}>/{item.unit}</span> : null}
+                </td>
                 <td>{formatCurrency(item.qty * item.rate)}</td>
               </tr>
             ))}

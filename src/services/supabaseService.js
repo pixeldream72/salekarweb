@@ -1,6 +1,8 @@
 import { supabase } from './supabaseClient.js';
 import { getCurrentTenant, resolveTenant } from './tenantResolver.js';
 
+const businessDetailSelect = 'id, shop_owner_id, currencySymbol, userType, created_date, sync_id, isSync, basic_info, contact_info, website_content, website_settings, social_accounts, website_slug, custom_domain, logoPath';
+
 export const mockProducts = [
   { id: 1, name: 'Premium Starter Kit', price: 1500, description: 'A best-selling bundle for new customers.' },
   { id: 2, name: 'Wholesale Toy Pack', price: 2200, description: 'Bulk order favorite for retail shops.' },
@@ -64,83 +66,181 @@ async function readTenantScopedTable({
   };
 }
 
-export async function fetchBusinessDetail(shopOwnerId = getCurrentTenant().shopOwnerId) {
+export async function fetchBusinessDetail(
+  shopOwnerId = getCurrentTenant().shopOwnerId
+) {
   const fallback = getCurrentTenant();
 
+  console.log('========== BUSINESS DETAIL TEST ==========');
+  console.log('shopOwnerId being searched:', shopOwnerId);
+  console.log('fallback:', fallback);
+
   if (!shopOwnerId) {
-    return {
-      data: null,
-      source: 'not_found',
-      error: null,
-    };
+    console.log('❌ NO SHOP OWNER ID');
+    return { data: null, source: 'not_found', error: null };
   }
 
   const { data, error } = await supabase
     .from('BusinessDetail')
-    .select('id, user_id, businessName, phone1Title, phone1Number, phone2Title, phone2Number, address, city, email, logoPath, invoiceFooterNote, currencySymbol, userType')
-    .eq('user_id', shopOwnerId)
+    .select(
+      'id, shop_owner_id, basic_info, contact_info, website_content, website_settings, social_accounts, website_slug, custom_domain, logoPath'
+    )
+    .eq('shop_owner_id', shopOwnerId)
     .limit(1);
 
+  console.log('Supabase BusinessDetail data:', data);
+  console.log('Supabase BusinessDetail error:', error);
+
   if (error) {
-    console.warn('BusinessDetail lookup failed:', error.message);
-    return {
-      data: null,
-      source: 'not_found',
-      error,
-    };
+    console.error('❌ BusinessDetail lookup failed:', error);
+    return { data: null, source: 'not_found', error };
   }
 
   const rows = Array.isArray(data) ? data : [];
 
+  console.log('Number of rows:', rows.length);
+
   if (!rows.length) {
-    return {
-      data: null,
-      source: 'not_found',
-      error: null,
-    };
+    console.log('❌ NO BusinessDetail ROW FOUND');
+    return { data: null, source: 'not_found', error: null };
   }
 
-  const matched = rows[0];
+  console.log('RAW BusinessDetail row:', rows[0]);
+  console.log('RAW basic_info:', rows[0].basic_info);
+  console.log('RAW businessName:', rows[0].basic_info?.businessName);
+  console.log('RAW ownerName:', rows[0].basic_info?.ownerName);
+
+  const normalized = normalizeBusinessDetailRecord(rows[0], fallback);
+
+  console.log('NORMALIZED BusinessDetail:', normalized);
+  console.log('NORMALIZED businessName:', normalized.businessName);
+  console.log('NORMALIZED ownerName:', normalized.ownerName);
+  console.log('==========================================');
 
   return {
-    data: normalizeBusinessDetailRecord(matched, fallback),
+    data: normalized,
     source: 'supabase',
     error: null,
   };
 }
 
+export async function fetchBusinessDetailBySlug(slug = '') {
+  const normalizedSlug = String(slug || '').trim().toLowerCase();
+
+  if (!normalizedSlug) {
+    return { data: null, source: 'not_found', error: null };
+  }
+
+  const { data, error } = await supabase
+    .from('BusinessDetail')
+    .select(businessDetailSelect)
+    .eq('website_slug', normalizedSlug)
+    .limit(1);
+
+  if (error) {
+    console.warn('BusinessDetail slug lookup failed:', error.message);
+    return { data: null, source: 'not_found', error };
+  }
+
+  const matched = Array.isArray(data) ? data[0] : null;
+
+  return matched
+    ? { data: normalizeBusinessDetailRecord(matched, getCurrentTenant()), source: 'supabase', error: null }
+    : { data: null, source: 'not_found', error: null };
+}
+
 function normalizeBusinessDetailRecord(record, fallback) {
-   const id = pickFirstDefined(record, ['id'], fallback.id);
-  const businessName = pickFirstDefined(record, ['businessName'], fallback.businessName);
-  const businessType = pickFirstDefined(record, ['userType'], fallback.businessType);
-  const domain = fallback.domain;
-  const phone = pickFirstDefined(record, ['phone1Number'], fallback.phone);
-  const phone2Number = pickFirstDefined(record, ['phone2Number'], fallback.phone2Number || '');
-  const whatsapp = pickFirstDefined(record, ['phone1Number'], fallback.whatsapp);
-  const address = pickFirstDefined(record, ['address'], fallback.address || '');
-  const city = pickFirstDefined(record, ['city'], fallback.city || '');
-  const email = pickFirstDefined(record, ['email'], fallback.email || '');
-  const currencySymbol = pickFirstDefined(record, ['currencySymbol'], fallback.currencySymbol || 'PKR');
-  const logoPath = pickFirstDefined(record, ['logoPath'], fallback.logoPath || '');
-  const logoUrl = getPublicImageUrl('logo-img', logoPath);
- 
+  const parseJson = (value, defaultValue) => {
+    if (!value) return defaultValue;
+
+    if (typeof value === 'object') {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch (error) {
+        console.warn('Failed to parse JSON:', value, error);
+        return defaultValue;
+      }
+    }
+
+    return defaultValue;
+  };
+
+  const basicInfo = parseJson(record.basic_info, {});
+  const contactInfoList = parseJson(record.contact_info, []);
+  const websiteContent = parseJson(record.website_content, {});
+  const about_our_business = websiteContent.about_our_business || '';
+  const what_we_offer = websiteContent.what_we_offer || '';
+  const why_choose_us = websiteContent.why_choose_us || '';
+  console.log('Parsed websiteContent:', websiteContent);
+  const socialAccountsList = parseJson(record.social_accounts, []);
+  const websiteSettings = parseJson(record.website_settings, {});
+  const theme = websiteSettings.theme || {};
+  const businessName = basicInfo.businessName || fallback.businessName || '';
+  const address = basicInfo.address || '';
+  const city = basicInfo.city || '';
+  const email = basicInfo.email || '';
+  const slogan = basicInfo.slogan ||''; 
+  const currencySymbol = basicInfo.currencySymbol ||
+   websiteSettings.currencySymbol ||
+    fallback.currencySymbol || 'PKR';
+
+  const ownerName = basicInfo.ownerName || '';
+
+  const invoiceFooterNote = basicInfo.invoiceFooterNote || '';
+
+  const primaryPhone = Array.isArray(contactInfoList)
+      ? contactInfoList[0]?.number || ''
+      : '';
+
+  const logoUrl = getPublicImageUrl('logo-img', record.logoPath || '');
+
 
   return {
     ...fallback,
-    id,
+    id: record.id,
+    shopOwnerId: record.shop_owner_id,
     businessName,
-    businessType,
-    domain,
-    phone,
-    phone1Number: phone,
-    phone2Number,
-    whatsapp,
     address,
     city,
     email,
     currencySymbol,
-    logoPath,
+    ownerName,
+    invoiceFooterNote,
+    slogan,
+    about_our_business,
+    what_we_offer,
+    why_choose_us,
+    phone: primaryPhone,
+    contactList: Array.isArray(contactInfoList)
+      ? contactInfoList
+      : [],
+    socialAccounts: Array.isArray(socialAccountsList)
+      ? socialAccountsList
+      : [],
+    websiteEnabled:
+      websiteSettings.websiteEnabled !== false,
+    theme: {
+      primaryColor:
+        theme.primaryColor || '#2563eb',
+      secondaryColor:
+        theme.secondaryColor || '#f59e0b',
+      backgroundColor:
+        theme.backgroundColor || '#ffffff',
+      textColor:
+        theme.textColor || '#0f172a',
+    },
+
     logoUrl,
+
+    slug:
+      record.website_slug || '',
+
+    customDomain:
+      record.custom_domain || '',
   };
 }
 
@@ -402,3 +502,57 @@ export async function updateQuotation({ quotationId, shopOwnerId, items = [] }) 
 
   return { items: preparedItems };
 }
+
+export async function resolveShopOwnerIdBySlugOrDomain(hostname) {
+  const normalized = (hostname || '').toLowerCase().replace(/^www\./, '').replace(/:\d+$/, '');
+
+  if (!normalized) {
+    return null;
+  }
+
+  // Priority 1: check if this exact hostname matches someone's custom_domain
+  const { data: customDomainMatch } = await supabase
+    .from('BusinessDetail')
+    .select('shop_owner_id')
+    .eq('custom_domain', normalized)
+    .limit(1)
+    .maybeSingle();
+
+  if (customDomainMatch?.shop_owner_id) {
+    return customDomainMatch.shop_owner_id;
+  }
+
+  // Priority 2: fall back to matching the subdomain as a website_slug
+  const subdomain = normalized.split('.')[0];
+
+  const { data: slugMatch } = await supabase
+    .from('BusinessDetail')
+    .select('shop_owner_id')
+    .eq('website_slug', subdomain)
+    .limit(1)
+    .maybeSingle();
+
+  return slugMatch?.shop_owner_id || null;
+}
+
+export function isValidUuid(value) {
+  return Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
+}
+
+export async function resolveShopOwnerIdBySlug(slug) {
+  console.log('resolveShopOwnerIdBySlug called with:', slug); // TEMP DEBUG
+
+  if (!slug) return null;
+
+  const { data, error } = await supabase
+    .from('BusinessDetail')
+    .select('shop_owner_id')
+    .eq('website_slug', slug)
+    .limit(1)
+    .maybeSingle();
+
+  console.log('resolveShopOwnerIdBySlug result:', data, error); // TEMP DEBUG
+
+  return data?.shop_owner_id || null;
+}
+

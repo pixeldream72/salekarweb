@@ -29,9 +29,15 @@ export function CartProvider({ children }) {
   };
 
   const updateQuantity = (productId, quantity) => {
+    const nextQuantity = Number(quantity);
+
+    if (!Number.isFinite(nextQuantity) || nextQuantity < 0) {
+      return;
+    }
+
     setItems((current) =>
       current.map((item) =>
-        item.product.id === productId ? { ...item, quantity: Number(quantity) || 0 } : item,
+        item.product.id === productId ? { ...item, quantity: nextQuantity } : item,
       ),
     );
   };
