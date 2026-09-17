@@ -23,6 +23,7 @@ const TenantContext = createContext(null);
 
 const EMPTY_TENANT = {
   shopOwnerId: null,
+  tenantSlug: '',
   source: null,
   domain: '',
   businessName: '',
@@ -65,17 +66,38 @@ export function TenantProvider({ children }) {
       try {
         /*
          * -----------------------------------------
-         * 1. Resolve tenant from URL path
+         * 1. Get tenant from URL
          * -----------------------------------------
+         *
+         * Examples:
+         *
+         * /pd-traders
+         * /pd-traders/products
+         * /pd-traders/login
+         *
+         * tenantSlug = pd-traders
          */
 
-        const pathSegment = extractShopOwnerIdFromPath(pathname);
+        const pathSegment =
+          extractShopOwnerIdFromPath(pathname);
 
         let resolvedShopOwnerId = null;
         let source = null;
+        let tenantSlug = '';
 
         if (pathSegment) {
           console.log('Path tenant:', pathSegment);
+
+          /*
+           * -----------------------------------------
+           * 1A. UUID in path
+           * -----------------------------------------
+           *
+           * This is kept for backward compatibility.
+           *
+           * Example:
+           * /550e8400-e29b-41d4-a716-446655440000
+           */
 
           if (isValidUuid(pathSegment)) {
             resolvedShopOwnerId = pathSegment;
@@ -85,14 +107,29 @@ export function TenantProvider({ children }) {
               'Using UUID from path:',
               resolvedShopOwnerId
             );
-          } else {
+          }
+
+          /*
+           * -----------------------------------------
+           * 1B. Slug in path
+           * -----------------------------------------
+           *
+           * Normal new URL:
+           *
+           * /pd-traders
+           * /pd-traders/products
+           */
+
+          else {
+            tenantSlug = pathSegment;
+
             console.log(
-              'Path is slug. Resolving slug:',
-              pathSegment
+              'Path is tenant slug. Resolving:',
+              tenantSlug
             );
 
             resolvedShopOwnerId =
-              await getShopOwnerIdBySlug(pathSegment);
+              await getShopOwnerIdBySlug(tenantSlug);
 
             source = 'path-slug';
 
@@ -107,6 +144,10 @@ export function TenantProvider({ children }) {
          * -----------------------------------------
          * 2. If no path tenant, resolve hostname
          * -----------------------------------------
+         *
+         * This is useful later for custom domains:
+         *
+         * pdtraders.com
          */
 
         if (!resolvedShopOwnerId) {
@@ -116,7 +157,9 @@ export function TenantProvider({ children }) {
           );
 
           resolvedShopOwnerId =
-            await resolveShopOwnerIdBySlugOrDomain(hostname);
+            await resolveShopOwnerIdBySlugOrDomain(
+              hostname
+            );
 
           if (resolvedShopOwnerId) {
             source = 'domain';
@@ -147,7 +190,8 @@ export function TenantProvider({ children }) {
           if (!isActive) return;
 
           setTenant({
-            shopOwnerId: null,
+            ...EMPTY_TENANT,
+            tenantSlug,
             source: source || 'not-found',
             domain: hostname,
             businessName: 'Shop not found',
@@ -171,10 +215,12 @@ export function TenantProvider({ children }) {
         setTenant({
           ...EMPTY_TENANT,
           shopOwnerId: resolvedShopOwnerId,
+          tenantSlug,
           source,
           domain: hostname,
           isLoading: true,
-          loadingMessage: 'Loading business information...',
+          loadingMessage:
+            'Loading business information...',
           isInvalidTenant: false,
         });
 
@@ -190,7 +236,9 @@ export function TenantProvider({ children }) {
          */
 
         const { data, error } =
-          await fetchBusinessDetail(resolvedShopOwnerId);
+          await fetchBusinessDetail(
+            resolvedShopOwnerId
+          );
 
         if (!isActive) return;
 
@@ -201,7 +249,8 @@ export function TenantProvider({ children }) {
           );
 
           setTenant({
-            shopOwnerId: null,
+            ...EMPTY_TENANT,
+            tenantSlug,
             source: 'business-detail-error',
             domain: hostname,
             businessName: 'Shop not found',
@@ -221,7 +270,8 @@ export function TenantProvider({ children }) {
           );
 
           setTenant({
-            shopOwnerId: null,
+            ...EMPTY_TENANT,
+            tenantSlug,
             source: 'business-detail-not-found',
             domain: hostname,
             businessName: 'Shop not found',
@@ -247,7 +297,14 @@ export function TenantProvider({ children }) {
 
         setTenant({
           ...data,
+
           shopOwnerId: resolvedShopOwnerId,
+
+          /*
+           * Always keep the URL slug available.
+           */
+          tenantSlug,
+
           source,
           domain: hostname,
           isLoading: false,
@@ -264,7 +321,8 @@ export function TenantProvider({ children }) {
         if (!isActive) return;
 
         setTenant({
-          shopOwnerId: null,
+          ...EMPTY_TENANT,
+          tenantSlug: '',
           source: 'error',
           domain: hostname,
           businessName: 'Shop not found',

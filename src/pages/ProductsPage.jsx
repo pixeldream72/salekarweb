@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTenant } from '../contexts/TenantContext.jsx';
 import { useCart } from '../contexts/CartContext.jsx';
 import { fetchProducts } from '../services/supabaseService.js';
+import { useTenantPath } from '../hooks/useTenantPath.js';
 
 function groupProductsByItemCode(products) {
   const groups = {};
+  
 
   products.forEach((product) => {
     const key = product.item_code || 'uncategorized';
@@ -147,11 +149,13 @@ function VariantRow({ variant }) {
 
 function ProductsPage() {
   const { shopOwnerId } = useTenant();
+   const { getTenantPath } = useTenantPath();
   const [products, setProducts] = useState([]);
   const [source, setSource] = useState('loading');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [previewImage, setPreviewImage] = useState(null);
+ 
 
   useEffect(() => {
     let isMounted = true;

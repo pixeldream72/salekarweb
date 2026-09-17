@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchQuotations } from '../services/supabaseService.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { useTenantPath } from '../hooks/useTenantPath.js';
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('en-PK', {
@@ -25,6 +26,8 @@ function formatDate(value) {
 
 function MyQuotationsPage() {
   const { session } = useAuth();
+  const { getTenantPath } = useTenantPath();
+
   const customerId = session?.user?.id;
 
   const [quotations, setQuotations] = useState([]);
@@ -59,24 +62,42 @@ function MyQuotationsPage() {
       <div className="quotation-list">
         {quotations.length > 0 ? (
           quotations.map((quotation) => (
-            <article key={quotation.id} className="quotation-card">
+            <article
+              key={quotation.id}
+              className="quotation-card"
+            >
               <div className="quotation-header">
                 <div>
-                  <span className="quotation-id">{quotation.quotation_no || quotation.id}</span>
+                  <span className="quotation-id">
+                    {quotation.quotation_no || quotation.id}
+                  </span>
+
                   <h2>{quotation.customer_name}</h2>
                 </div>
-                <span className={`status-badge ${quotation.status}`}>{quotation.status}</span>
+
+                <span
+                  className={`status-badge ${quotation.status}`}
+                >
+                  {quotation.status}
+                </span>
               </div>
 
               <div className="quotation-meta">
-                <span>Created: {formatDate(quotation.created_date)}</span>
+                <span>
+                  Created: {formatDate(quotation.created_date)}
+                </span>
               </div>
 
               <div className="quotation-summary">
-                <strong>{formatCurrency(quotation.total_amount || 0)}</strong>
+                <strong>
+                  {formatCurrency(quotation.total_amount || 0)}
+                </strong>
               </div>
 
-              <Link className="text-link" to={`/quotation/${quotation.id}`}>
+              <Link
+                className="text-link"
+                to={getTenantPath(`/quotation/${quotation.id}`)}
+              >
                 View quotation
               </Link>
             </article>

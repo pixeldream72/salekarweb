@@ -31,27 +31,30 @@ function App() {
 
             <Route element={<AppLayout />}>
 
-              {/* Normal / custom-domain website */}
-              <Route path="/" element={<HomePage />} />
-              <Route path="/products" element={<ProductsPage />} />
-              <Route path="/about" element={<AboutPage />} />
-              <Route path="/contact" element={<ContactPage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/auth" element={<AuthPage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
-              <Route path="/cart" element={<CartPage />} />
-
-              {/* Tenant URL */}
-              <Route path="/shop/:shopOwnerId">
+              {/* Tenant website
+                  Example:
+                  /pd-traders
+                  /pd-traders/products
+                  /pd-traders/about
+                  /pd-traders/contact
+                  /pd-traders/login
+                  /pd-traders/cart
+              */}
+              <Route path="/:shopOwnerId">
                 <Route index element={<HomePage />} />
+
                 <Route path="products" element={<ProductsPage />} />
                 <Route path="about" element={<AboutPage />} />
                 <Route path="contact" element={<ContactPage />} />
+
                 <Route path="login" element={<LoginPage />} />
                 <Route path="register" element={<RegisterPage />} />
                 <Route path="auth" element={<AuthPage />} />
-                <Route path="reset-password" element={<ResetPasswordPage />} />
+                <Route
+                  path="reset-password"
+                  element={<ResetPasswordPage />}
+                />
+
                 <Route path="cart" element={<CartPage />} />
 
                 <Route
@@ -81,11 +84,11 @@ function App() {
                   }
                 />
 
+                {/* Invalid page inside a tenant */}
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
 
-              <Route path="/shop" element={<ShopNotFoundPage />} />
-
+              {/* Non-tenant / invalid routes */}
               <Route path="*" element={<NotFoundPage />} />
 
             </Route>

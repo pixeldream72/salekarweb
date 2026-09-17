@@ -564,4 +564,164 @@ export function isValidUuid(value) {
   return Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
 }
 
+export function normalizeCustomerProfile(record) {
+  if (!record) {
+    return null;
+  }
 
+  return {
+    id: record.id || '',
+    fullName: record.full_name || '',
+    phone: record.phone || '',
+    email: record.email || '',
+    city: record.city || '',
+    cargo: record.cargo || '',
+    createdAt: record.created_at || null,
+    lastQuotationNo: record.last_quotation_no ?? 0,
+  };
+}
+
+export async function fetchCustomerProfile(customerId) {
+  if (!customerId) {
+    return {
+      data: null,
+      error: new Error('Customer ID is required.'),
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('customer_profile')
+    .select(`
+      id,
+      full_name,
+      phone,
+      email,
+       city,
+      cargo,
+      created_at,
+      last_quotation_no
+    `)
+    .eq('id', customerId)
+    .maybeSingle();
+
+  console.log('Customer ID:', customerId);
+  console.log('Customer profile:', data);
+  console.log('Customer profile error:', error);
+
+  if (error) {
+    return {
+      data: null,
+      error,
+    };
+  }
+
+  return {
+    data: normalizeCustomerProfile(data),
+    error: null,
+  };
+}
+
+export async function updateCustomerProfile(
+  customerId,
+  {
+    fullName,
+    phone,
+    city,
+    cargo,
+  }
+) {
+  if (!customerId) {
+    return {
+      data: null,
+      error: new Error('Customer ID is required.'),
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('customer_profile')
+    .update({
+      full_name: fullName.trim(),
+      phone: phone.trim(),
+      city: city.trim(),
+      cargo: cargo.trim(),
+    })
+    .eq('id', customerId)
+    .select(`
+      id,
+      full_name,
+      phone,
+      email,
+      city,
+      cargo,
+      created_at,
+      last_quotation_no
+    `)
+    .single();
+
+  if (error) {
+    return {
+      data: null,
+      error,
+    };
+  }
+
+  return {
+    data: normalizeCustomerProfile(data),
+    error: null,
+  };
+}
+export async function createCustomerProfile({
+  customerId,
+  email,
+  fullName,
+  phone,
+  city,
+  cargo,
+}) {
+  if (!customerId) {
+    return {
+      data: null,
+      error: new Error('Customer ID is required.'),
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('customer_profile')
+    .insert({
+      id: customerId,
+      email: email || '',
+      full_name: fullName.trim(),
+      phone: phone.trim(),
+      city: city.trim(),
+      cargo: cargo.trim(),
+      last_quotation_no: 0,
+    })
+    .select(`
+      id,
+      full_name,
+      phone,
+      email,
+      city,
+      cargo,
+      created_at,
+      last_quotation_no
+    `)
+    .single();
+
+  if (error) {
+    console.error(
+      'Create customer profile error:',
+      error
+    );
+
+    return {
+      data: null,
+      error,
+    };
+  }
+
+  return {
+    data: normalizeCustomerProfile(data),
+    error: null,
+  };
+}

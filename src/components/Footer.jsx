@@ -1,4 +1,5 @@
 import { useTenant } from '../contexts/TenantContext.jsx';
+import { useTenantPath } from '../hooks/useTenantPath.js';
 
 function Footer() {
   const tenant = useTenant();

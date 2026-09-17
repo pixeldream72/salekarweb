@@ -3,42 +3,20 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { useTenant } from '../contexts/TenantContext.jsx';
 import { useCart } from '../contexts/CartContext.jsx';
 import { supabase } from '../services/supabaseClient.js';
-import {NavLink,useLocation,useNavigate,} from 'react-router-dom';
+import {NavLink,useNavigate,} from 'react-router-dom';
+import { useTenantPath } from '../hooks/useTenantPath.js';
 
 function Header() {
   const tenant = useTenant();
   const navigate = useNavigate();
+const { getTenantPath } = useTenantPath();
 
 
-const location = useLocation();
   const { session, signOut, user } = useAuth();
   const { totalItems } = useCart();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [displayName, setDisplayName] = useState('Account');
-
- const shopMatch = location.pathname.match(
-  /^\/shop\/([^/]+)/i
-);
-
-const tenantSlug = shopMatch?.[1] || '';
-
-    const tenantBasePath = tenantSlug
-  ? `/shop/${tenantSlug}`
-  : '';
-
-
-  const getTenantPath = (path = '') => {
-    if (!tenantBasePath) {
-      return path || '/';
-    }
-
-    if (!path || path === '/') {
-      return tenantBasePath;
-    }
-
-    return `${tenantBasePath}${path}`;
-  };
 
   const navItems = [
     { label: 'Home', to: getTenantPath('/') },

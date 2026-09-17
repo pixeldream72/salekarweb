@@ -1,9 +1,11 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { useTenantPath } from '../hooks/useTenantPath.js';
 
 function ProtectedRoute({ children }) {
   const { session, authLoading } = useAuth();
   const location = useLocation();
+  const { getTenantPath } = useTenantPath();
 
   if (authLoading) {
     return (
@@ -16,7 +18,18 @@ function ProtectedRoute({ children }) {
   }
 
   if (!session) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    const from =
+      location.pathname +
+      location.search +
+      location.hash;
+
+    return (
+      <Navigate
+        to={getTenantPath('/login')}
+        replace
+        state={{ from }}
+      />
+    );
   }
 
   return children;

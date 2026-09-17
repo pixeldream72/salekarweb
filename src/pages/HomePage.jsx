@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
 import { useTenant } from '../contexts/TenantContext.jsx';
+import { useTenantPath } from '../hooks/useTenantPath.js';
 
 function HomePage() {
   const tenant = useTenant();
+  const { getTenantPath } = useTenantPath();
 
   return (
     <div>
@@ -55,7 +57,13 @@ function HomePage() {
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+          }}
+        >
           <p
             style={{
               fontSize: '0.85rem',
@@ -69,10 +77,25 @@ function HomePage() {
           >
             Welcome to
           </p>
-          <h1 style={{ margin: '0.2rem 0 0', lineHeight: 1.2, fontSize: '1.75rem' }}>
+
+          <h1
+            style={{
+              margin: '0.2rem 0 0',
+              lineHeight: 1.2,
+              fontSize: '1.75rem',
+            }}
+          >
             {tenant.businessName}
+
             {tenant.slogan && (
-              <span style={{ display: 'block', fontSize: '0.9rem', color: '#64748b', marginTop: '0.2rem' }}>
+              <span
+                style={{
+                  display: 'block',
+                  fontSize: '0.9rem',
+                  color: '#64748b',
+                  marginTop: '0.2rem',
+                }}
+              >
                 {tenant.slogan}
               </span>
             )}
@@ -81,13 +104,33 @@ function HomePage() {
       </section>
 
       {/* Call to action */}
-      <section className="page-card" style={{ textAlign: 'center', padding: '2rem 1.5rem' }}>
-        <h2 style={{ marginTop: 0 }}>Browse our catalog and request a quote</h2>
-        <p style={{ color: '#64748b', maxWidth: '480px', margin: '0.5rem auto 1.5rem' }}>
-          {tenant.what_we_offer || 'Explore wholesale-ready products, build your quotation, and we\'ll get back to you fast.'}
-        
+      <section
+        className="page-card"
+        style={{
+          textAlign: 'center',
+          padding: '2rem 1.5rem',
+        }}
+      >
+        <h2 style={{ marginTop: 0 }}>
+          Browse our catalog and request a quote
+        </h2>
+
+        <p
+          style={{
+            color: '#64748b',
+            maxWidth: '480px',
+            margin: '0.5rem auto 1.5rem',
+          }}
+        >
+          {tenant.what_we_offer ||
+            "Explore wholesale-ready products, build your quotation, and we'll get back to you fast."}
         </p>
-        <Link to="/products" className="header-button primary" style={{ display: 'inline-block' }}>
+
+        <Link
+          to={getTenantPath('/products')}
+          className="header-button primary"
+          style={{ display: 'inline-block' }}
+        >
           Browse Products
         </Link>
       </section>
@@ -96,61 +139,155 @@ function HomePage() {
       <section
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gridTemplateColumns:
+            'repeat(auto-fit, minmax(200px, 1fr))',
           gap: '1rem',
           margin: '1.5rem 0',
         }}
       >
-        <div className="page-card" style={{ textAlign: 'center', padding: '1.5rem' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📦</div>
-          <h3 style={{ margin: '0 0 0.3rem' }}>Wholesale Ready</h3>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
-            Bulk-friendly pricing and quantities on every product.
+        <div
+          className="page-card"
+          style={{
+            textAlign: 'center',
+            padding: '1.5rem',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '2rem',
+              marginBottom: '0.5rem',
+            }}
+          >
+            📦
+          </div>
+
+          <h3 style={{ margin: '0 0 0.3rem' }}>
+            Wholesale Ready
+          </h3>
+
+          <p
+            style={{
+              color: '#64748b',
+              fontSize: '0.9rem',
+              margin: 0,
+            }}
+          >
+            Bulk-friendly pricing and quantities on every
+            product.
           </p>
         </div>
 
-        <div className="page-card" style={{ textAlign: 'center', padding: '1.5rem' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⚡</div>
-          <h3 style={{ margin: '0 0 0.3rem' }}>Quick Quotations</h3>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
-            Build your order and submit a quote request in minutes.
+        <div
+          className="page-card"
+          style={{
+            textAlign: 'center',
+            padding: '1.5rem',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '2rem',
+              marginBottom: '0.5rem',
+            }}
+          >
+            ⚡
+          </div>
+
+          <h3 style={{ margin: '0 0 0.3rem' }}>
+            Quick Quotations
+          </h3>
+
+          <p
+            style={{
+              color: '#64748b',
+              fontSize: '0.9rem',
+              margin: 0,
+            }}
+          >
+            Build your order and submit a quote request in
+            minutes.
           </p>
         </div>
 
-        <div className="page-card" style={{ textAlign: 'center', padding: '1.5rem' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔄</div>
-          <h3 style={{ margin: '0 0 0.3rem' }}>Easy Reordering</h3>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
+        <div
+          className="page-card"
+          style={{
+            textAlign: 'center',
+            padding: '1.5rem',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '2rem',
+              marginBottom: '0.5rem',
+            }}
+          >
+            🔄
+          </div>
+
+          <h3 style={{ margin: '0 0 0.3rem' }}>
+            Easy Reordering
+          </h3>
+
+          <p
+            style={{
+              color: '#64748b',
+              fontSize: '0.9rem',
+              margin: 0,
+            }}
+          >
             Reorder any past quotation with a single click.
           </p>
         </div>
       </section>
 
       {/* Contact info */}
-      {/* Contact info */}
-  {((tenant.contactList && tenant.contactList.length > 0) || tenant.address || tenant.ownerName) && (
-  <section className="page-card" style={{ padding: '1.5rem' }}>
-    <h3 style={{ marginTop: 0 }}>Get in touch</h3>
+      {((tenant.contactList &&
+        tenant.contactList.length > 0) ||
+        tenant.address ||
+        tenant.ownerName) && (
+        <section
+          className="page-card"
+          style={{ padding: '1.5rem' }}
+        >
+          <h3 style={{ marginTop: 0 }}>
+            Get in touch
+          </h3>
 
-    {tenant.contactList && tenant.contactList.map((contact, index) => (
-      <p key={index} style={{ margin: '0.3rem 0' }}>
-        📞 {contact.title ? `${contact.title}: ` : ''}{contact.number}
-      </p>
-    ))}
+          {tenant.contactList &&
+            tenant.contactList.map((contact, index) => (
+              <p
+                key={index}
+                style={{ margin: '0.3rem 0' }}
+              >
+                📞{' '}
+                {contact.title
+                  ? `${contact.title}: `
+                  : ''}
+                {contact.number}
+              </p>
+            ))}
 
-    {tenant.address && (
-      <p style={{ margin: '0.3rem 0' }}>
-        📍 {tenant.address}{tenant.city ? `, ${tenant.city}` : ''}
-      </p>
-    )}
+          {tenant.address && (
+            <p style={{ margin: '0.3rem 0' }}>
+              📍 {tenant.address}
+              {tenant.city ? `, ${tenant.city}` : ''}
+            </p>
+          )}
 
-    {tenant.ownerName && (
-      <p style={{ margin: '0.3rem 0', color: '#64748b', fontSize: '0.9rem' }}>
-        Owner: {tenant.ownerName}
-      </p>
-    )}
-  </section>
-)}
+          {tenant.ownerName && (
+            <p
+              style={{
+                margin: '0.3rem 0',
+                color: '#64748b',
+                fontSize: '0.9rem',
+              }}
+            >
+              Owner: {tenant.ownerName}
+            </p>
+          )}
+        </section>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { fetchQuotationById } from '../services/supabaseService.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useCart } from '../contexts/CartContext.jsx';
+import { useTenantPath } from '../hooks/useTenantPath.js';
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('en-PK', {
@@ -22,6 +23,7 @@ function formatDate(value) {
 }
 
 function QuotationDetailPage() {
+  const { getTenantPath } = useTenantPath();
   const { id } = useParams();
   const { session } = useAuth();
   const { loadQuotationForEditing, loadQuotationForReorder } = useCart();
@@ -59,12 +61,12 @@ function QuotationDetailPage() {
 
   const handleEditInCart = () => {
     loadQuotationForEditing(quote.id, quote.items);
-    navigate('/cart');
+    navigate(getTenantPath('/cart'));
   };
 
   const handleReorder = () => {
     loadQuotationForReorder(quote.items);
-    navigate('/cart');
+    navigate(getTenantPath('/cart'));
   };
 
   return (
@@ -74,7 +76,7 @@ function QuotationDetailPage() {
 
       <div className="quote-header-row">
         <span className={`status-badge ${quote.status}`}>{quote.status}</span>
-        <Link className="text-link" to="/my-quotations">
+        <Link className="text-link" to={getTenantPath('/my-quotations')}>
           Back to quotations
         </Link>
       </div>
