@@ -176,7 +176,9 @@ export async function fetchBusinessDetailBySlug(slug = '') {
 
 function normalizeBusinessDetailRecord(record, fallback) {
   const parseJson = (value, defaultValue) => {
-    if (!value) return defaultValue;
+    if (!value) {
+      return defaultValue;
+    }
 
     if (typeof value === 'object') {
       return value;
@@ -186,7 +188,12 @@ function normalizeBusinessDetailRecord(record, fallback) {
       try {
         return JSON.parse(value);
       } catch (error) {
-        console.warn('Failed to parse JSON:', value, error);
+        console.warn(
+          'Failed to parse JSON:',
+          value,
+          error
+        );
+
         return defaultValue;
       }
     }
@@ -194,81 +201,528 @@ function normalizeBusinessDetailRecord(record, fallback) {
     return defaultValue;
   };
 
-  const basicInfo = parseJson(record.basic_info, {});
-  const contactInfoList = parseJson(record.contact_info, []);
-  const websiteContent = parseJson(record.website_content, {});
-  const about_our_business = websiteContent.about_our_business || '';
-  const what_we_offer = websiteContent.what_we_offer || '';
-  const why_choose_us = websiteContent.why_choose_us || '';
-  console.log('Parsed websiteContent:', websiteContent);
-  const socialAccountsList = parseJson(record.social_accounts, []);
-  const websiteSettings = parseJson(record.website_settings, {});
-  const theme = websiteSettings.theme || {};
-  const businessName = basicInfo.businessName || fallback.businessName || '';
-  const address = basicInfo.address || '';
-  const city = basicInfo.city || '';
-  const email = basicInfo.email || '';
-  const slogan = basicInfo.slogan ||''; 
-  const currencySymbol = basicInfo.currencySymbol ||
-   websiteSettings.currencySymbol ||
-    fallback.currencySymbol || 'PKR';
+  /*
+   * ---------------------------------------------------------
+   * Parse JSON columns
+   * ---------------------------------------------------------
+   */
 
-  const ownerName = basicInfo.ownerName || '';
+  const basicInfo = parseJson(
+    record?.basic_info,
+    {}
+  );
 
-  const invoiceFooterNote = basicInfo.invoiceFooterNote || '';
+  const contactInfo = parseJson(
+    record?.contact_info,
+    []
+  );
 
-  const primaryPhone = Array.isArray(contactInfoList)
-      ? contactInfoList[0]?.number || ''
-      : '';
+  const websiteContent = parseJson(
+    record?.website_content,
+    {}
+  );
 
-  const logoUrl = getPublicImageUrl('logo-img', record.logoPath || '');
+  const websiteSettings = parseJson(
+    record?.website_settings,
+    {}
+  );
 
+  const socialAccounts = parseJson(
+    record?.social_accounts,
+    []
+  );
+
+  /*
+   * ---------------------------------------------------------
+   * Notifications
+   * ---------------------------------------------------------
+   *
+   * Stored inside:
+   *
+   * website_settings.notifications
+   *
+   * Example:
+   *
+   * {
+   *   "enabled": true,
+   *   "notifyApp": false,
+   *   "notifyWhatsapp": true,
+   *   "whatsappNumber": "03013702005"
+   * }
+   */
+
+  const notifications =
+    websiteSettings?.notifications &&
+    typeof websiteSettings.notifications === 'object'
+      ? websiteSettings.notifications
+      : {};
+
+  /*
+   * ---------------------------------------------------------
+   * IDs
+   * ---------------------------------------------------------
+   */
+
+  const id = pickFirstDefined(
+    record,
+    ['id'],
+    fallback?.id || ''
+  );
+
+  /*
+   * IMPORTANT:
+   *
+   * BusinessDetail uses shop_owner_id.
+   *
+   * Do NOT use user_id here.
+   */
+
+  const shopOwnerId = pickFirstDefined(
+    record,
+    ['shop_owner_id'],
+    fallback?.shopOwnerId || ''
+  );
+
+  /*
+   * ---------------------------------------------------------
+   * Business information
+   * ---------------------------------------------------------
+   */
+
+  const businessName = pickFirstDefined(
+    basicInfo,
+    [
+      'businessName',
+      'business_name',
+      'name',
+    ],
+    fallback?.businessName || ''
+  );
+
+  const ownerName = pickFirstDefined(
+    basicInfo,
+    [
+      'ownerName',
+      'owner_name',
+    ],
+    fallback?.ownerName || ''
+  );
+
+  const businessType = pickFirstDefined(
+    record,
+    ['userType'],
+    fallback?.businessType || 'Retail Commerce'
+  );
+
+  /*
+   * ---------------------------------------------------------
+   * Contact information
+   * ---------------------------------------------------------
+   *
+   * New database format:
+   *
+   * [
+   *   {
+   *     "number": "03013702005",
+   *     "title": "Murad ali"
+   *   },
+   *   {
+   *     "number": "03444025688",
+   *     "title": "Whats app"
+   *   }
+   * ]
+   *
+   * Older format may still be an object, so support both.
+   */
+
+  const contactList = Array.isArray(contactInfo)
+    ? contactInfo
+    : [];
+
+  const contactObject =
+    contactInfo &&
+    typeof contactInfo === 'object' &&
+    !Array.isArray(contactInfo)
+      ? contactInfo
+      : {};
+
+  const firstContactNumber =
+    contactList.find(
+      (item) =>
+        item &&
+        typeof item.number === 'string' &&
+        item.number.trim()
+    )?.number || '';
+
+  const secondContactNumber =
+    contactList
+      .filter(
+        (item) =>
+          item &&
+          typeof item.number === 'string' &&
+          item.number.trim()
+      )
+      .map((item) => item.number)[1] || '';
+
+  const phone = pickFirstDefined(
+    contactObject,
+    [
+      'phone',
+      'phone1Number',
+      'phone1_number',
+    ],
+    firstContactNumber ||
+      fallback?.phone ||
+      ''
+  );
+
+  const phone2Number = pickFirstDefined(
+    contactObject,
+    [
+      'phone2Number',
+      'phone2_number',
+    ],
+    secondContactNumber ||
+      fallback?.phone2Number ||
+      ''
+  );
+
+  /*
+   * ---------------------------------------------------------
+   * WhatsApp
+   * ---------------------------------------------------------
+   *
+   * Prefer the WhatsApp number saved in:
+   *
+   * website_settings.notifications.whatsappNumber
+   *
+   * Then fall back to old contact information.
+   */
+
+  const whatsapp =
+    notifications.whatsappNumber ||
+    pickFirstDefined(
+      contactObject,
+      [
+        'whatsapp',
+        'phone1Number',
+        'phone1_number',
+      ],
+      phone ||
+        fallback?.whatsapp ||
+        ''
+    );
+
+  /*
+   * ---------------------------------------------------------
+   * Address / City / Email
+   * ---------------------------------------------------------
+   *
+   * Your current database stores these in basic_info.
+   */
+
+  const address = pickFirstDefined(
+    basicInfo,
+    ['address'],
+    fallback?.address || ''
+  );
+
+  const city = pickFirstDefined(
+    basicInfo,
+    ['city'],
+    fallback?.city || ''
+  );
+
+  const email = pickFirstDefined(
+    basicInfo,
+    ['email'],
+    fallback?.email || ''
+  );
+
+  /*
+   * ---------------------------------------------------------
+   * Currency
+   * ---------------------------------------------------------
+   */
+
+  const currencySymbol = pickFirstDefined(
+    basicInfo,
+    ['currencySymbol'],
+    websiteSettings?.currencySymbol ||
+      fallback?.currencySymbol ||
+      'PKR'
+  );
+
+  /*
+   * ---------------------------------------------------------
+   * Logo
+   * ---------------------------------------------------------
+   */
+
+  const logoPath = pickFirstDefined(
+    record,
+    ['logoPath'],
+    fallback?.logoPath || ''
+  );
+
+  const logoUrl = getPublicImageUrl(
+    'logo-img',
+    logoPath
+  );
+
+  /*
+   * ---------------------------------------------------------
+   * Website settings
+   * ---------------------------------------------------------
+   */
+
+  const websiteEnabled =
+    websiteSettings?.websiteEnabled !== false;
+
+  /*
+   * ---------------------------------------------------------
+   * Theme
+   * ---------------------------------------------------------
+   */
+
+  const themeSettings =
+    websiteSettings?.theme &&
+    typeof websiteSettings.theme === 'object'
+      ? websiteSettings.theme
+      : {};
+
+  const theme = {
+    primaryColor:
+      themeSettings.primaryColor ||
+      fallback?.theme?.primaryColor ||
+      '#2563eb',
+
+    secondaryColor:
+      themeSettings.secondaryColor ||
+      fallback?.theme?.secondaryColor ||
+      '#f59e0b',
+
+    backgroundColor:
+      themeSettings.backgroundColor ||
+      fallback?.theme?.backgroundColor ||
+      '#ffffff',
+
+    textColor:
+      themeSettings.textColor ||
+      fallback?.theme?.textColor ||
+      '#0f172a',
+  };
+
+  /*
+   * ---------------------------------------------------------
+   * Domain / slug
+   * ---------------------------------------------------------
+   */
+
+  const slug =
+    record?.website_slug ||
+    fallback?.slug ||
+    '';
+
+  const customDomain =
+    record?.custom_domain ||
+    fallback?.customDomain ||
+    '';
+
+  /*
+   * ---------------------------------------------------------
+   * Debug
+   * ---------------------------------------------------------
+   */
+
+  console.log(
+    '========== WEBSITE SETTINGS DEBUG =========='
+  );
+
+  console.log(
+    'RAW website_settings:',
+    record?.website_settings
+  );
+
+  console.log(
+    'PARSED websiteSettings:',
+    websiteSettings
+  );
+
+  console.log(
+    'PARSED notifications:',
+    notifications
+  );
+
+  console.log(
+    'notifyWhatsapp:',
+    notifications.notifyWhatsapp
+  );
+
+  console.log(
+    'whatsappNumber:',
+    notifications.whatsappNumber
+  );
+
+  console.log(
+    'NORMALIZED shopOwnerId:',
+    shopOwnerId
+  );
+
+  console.log(
+    '============================================'
+  );
+
+  /*
+   * ---------------------------------------------------------
+   * Final normalized tenant object
+   * ---------------------------------------------------------
+   */
 
   return {
     ...fallback,
-    id: record.id,
-    shopOwnerId: record.shop_owner_id,
+
+    /*
+     * Database identity
+     */
+    id,
+
+    user_id: shopOwnerId,
+
+    shopOwnerId,
+
+    /*
+     * Business
+     */
     businessName,
-    address,
-    city,
-    email,
-    currencySymbol,
+
     ownerName,
-    invoiceFooterNote,
-    slogan,
-    about_our_business,
-    what_we_offer,
-    why_choose_us,
-    phone: primaryPhone,
-    contactList: Array.isArray(contactInfoList)
-      ? contactInfoList
-      : [],
-    socialAccounts: Array.isArray(socialAccountsList)
-      ? socialAccountsList
-      : [],
-    websiteEnabled:
-      websiteSettings.websiteEnabled !== false,
-    theme: {
-      primaryColor:
-        theme.primaryColor || '#2563eb',
-      secondaryColor:
-        theme.secondaryColor || '#f59e0b',
-      backgroundColor:
-        theme.backgroundColor || '#ffffff',
-      textColor:
-        theme.textColor || '#0f172a',
-    },
+
+    businessType,
+
+    /*
+     * Contact
+     */
+    phone,
+
+    phone1Number: phone,
+
+    phone2Number,
+
+    whatsapp,
+
+    contactList,
+
+    address,
+
+    city,
+
+    email,
+
+    /*
+     * Currency
+     */
+    currencySymbol,
+
+    /*
+     * Logo
+     */
+    logoPath,
 
     logoUrl,
 
-    slug:
-      record.website_slug || '',
+    /*
+     * Website content
+     */
+    about_our_business:
+      websiteContent?.about_our_business ||
+      '',
 
-    customDomain:
-      record.custom_domain || '',
+    what_we_offer:
+      websiteContent?.what_we_offer ||
+      '',
+
+    why_choose_us:
+      websiteContent?.why_choose_us ||
+      '',
+
+    /*
+     * Website settings
+     */
+    websiteEnabled,
+
+    /*
+     * Notifications
+     */
+    notifications: {
+      enabled:
+        notifications.enabled === true,
+
+      notifyApp:
+        notifications.notifyApp === true,
+
+      notifyWhatsapp:
+        notifications.notifyWhatsapp === true,
+
+      whatsappNumber:
+        notifications.whatsappNumber ||
+        '',
+    },
+
+    /*
+     * Theme
+     */
+    theme,
+
+    primaryColor:
+      theme.primaryColor,
+
+    secondaryColor:
+      theme.secondaryColor,
+
+    backgroundColor:
+      theme.backgroundColor,
+
+    textColor:
+      theme.textColor,
+
+    /*
+     * Social accounts
+     */
+    socialAccounts: Array.isArray(
+      socialAccounts
+    )
+      ? socialAccounts
+      : [],
+
+    /*
+     * Tenant URL
+     */
+    slug,
+
+    website_slug: slug,
+
+    customDomain,
+
+    custom_domain:
+      record?.custom_domain || '',
+
+    /*
+     * This is a real tenant record,
+     * so don't keep fallback isUnknown=true.
+     */
+    isUnknown: false,
+
+    source:
+      fallback?.source || 'database',
+
+    domain:
+      customDomain ||
+      slug ||
+      fallback?.domain ||
+      '',
   };
 }
-
 function getPublicImageUrl(bucket, imagePath) {
   if (!imagePath) {
     return null;
@@ -356,7 +810,8 @@ export async function fetchCategories() {
   });
 }
 
-export async function fetchQuotations(customerId = '') {
+export async function fetchQuotations(customerId = '',shopOwnerId = '') {
+
   if (!customerId) {
     return { data: [], source: 'private', error: null };
   }
@@ -365,15 +820,12 @@ export async function fetchQuotations(customerId = '') {
     .from('quotation')
     .select('*')
     .eq('customer_id', customerId)
-    .eq('is_delete', false)
+    .eq('shop_owner_id',shopOwnerId)
     .order('created_date', { ascending: false })
     .limit(50);
-
   if (error) {
-    console.warn('Quotations lookup failed:', error.message);
     return { data: [], source: 'error', error };
   }
-
   return { data: data || [], source: 'supabase', error: null };
 }
 
@@ -408,7 +860,6 @@ export async function fetchQuotationById(quoteId, customerId = '') {
     error: null,
   };
 }
-
 export async function createQuotation({ shopOwnerId, customerId, customerEmail, items = [], remarks = '' }) {
   const now = Date.now();
   const totalAmount = items.reduce((sum, item) => sum + Number(item.quantity) * Number(item.product.price), 0);
@@ -481,12 +932,12 @@ export async function createQuotation({ shopOwnerId, customerId, customerEmail, 
 
   return { quotation: createdQuotation, items: preparedItems };
 }
-export async function updateQuotation({ quotationId, shopOwnerId, items = [] }) {
+export async function updateQuotation({ quotationId, shopOwnerId, items = [], remarks = '' }) {
   const totalAmount = items.reduce((sum, item) => sum + Number(item.quantity) * Number(item.product.price), 0);
-
   const { error: updateError } = await supabase
     .from('quotation')
-    .update({ total_amount: totalAmount })
+    .update({ total_amount: totalAmount,
+      remarks: remarks?.trim() || null,})
     .eq('id', quotationId);
 
   if (updateError) {
@@ -515,6 +966,7 @@ export async function updateQuotation({ quotationId, shopOwnerId, items = [] }) 
     unit: item.product.unit,
     rate: item.product.price,
     price: item.quantity * item.product.price,
+    
   }));
 
   if (preparedItems.length > 0) {
@@ -559,11 +1011,9 @@ export async function resolveShopOwnerIdBySlugOrDomain(hostname) {
 
   return slugMatch?.shop_owner_id || null;
 }
-
 export function isValidUuid(value) {
   return Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
 }
-
 export function normalizeCustomerProfile(record) {
   if (!record) {
     return null;
@@ -580,7 +1030,6 @@ export function normalizeCustomerProfile(record) {
     lastQuotationNo: record.last_quotation_no ?? 0,
   };
 }
-
 export async function fetchCustomerProfile(customerId) {
   if (!customerId) {
     return {
@@ -620,7 +1069,6 @@ export async function fetchCustomerProfile(customerId) {
     error: null,
   };
 }
-
 export async function updateCustomerProfile(
   customerId,
   {

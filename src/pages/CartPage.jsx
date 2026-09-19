@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { useTenant } from '../contexts/TenantContext.jsx';
 import { createQuotation, updateQuotation } from '../services/supabaseService.js';
 import { useTenantPath } from '../hooks/useTenantPath.js';
+import { createWhatsAppQuotationLink } from '../utils/whatsapp.js';
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('en-PK', {
@@ -44,22 +45,31 @@ function CartPage() {
     clearCart,
     cartMode,
     editingQuotationId,
+    editingRemarks,
   } = useCart();
 
   const { session } = useAuth();
-  const { shopOwnerId } = useTenant();
+  const tenant = useTenant();
+  const { shopOwnerId } = tenant;
   const { getTenantPath } = useTenantPath();
+  const whatsappEnabled =
+  tenant?.notifications?.notifyWhatsapp === true;
+
+const whatsappNumber =
+  tenant?.notifications?.whatsappNumber || '';
 
   const navigate = useNavigate();
-
+  const [remarks, setRemarks] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [previewImage, setPreviewImage] = useState(null);
   const [draftQuantities, setDraftQuantities] = useState({});
-
+  const [showWhatsappPopup, setShowWhatsappPopup] = useState(false);
+  const [whatsappLink, setWhatsappLink] = useState('');
   const groupedCart = groupCartItemsByItemCode(items);
 
   useEffect(() => {
+    
     setDraftQuantities((current) => {
       const next = { ...current };
 
@@ -81,6 +91,27 @@ function CartPage() {
     });
   }, [items]);
 
+  useEffect(() => {
+  if (cartMode === 'editing') {
+    setRemarks(editingRemarks || '');
+  }
+}, [cartMode, editingQuotationId, editingRemarks]);
+  const handleWhatsappNotify = () => {
+  if (whatsappLink) {
+    window.open(
+      whatsappLink,
+      '_blank',
+      'noopener,noreferrer'
+    );
+  }
+
+  setShowWhatsappPopup(false);
+};
+
+const handleSkipWhatsapp = () => {
+  setShowWhatsappPopup(false);
+};
+
   const handleSubmit = async () => {
     setError('');
 
@@ -97,33 +128,61 @@ function CartPage() {
     setIsSubmitting(true);
 
     try {
+
+
       if (cartMode === 'editing' && editingQuotationId) {
         await updateQuotation({
           quotationId: editingQuotationId,
           shopOwnerId,
           items,
+          remarks: remarks.trim(),
         });
-
+        
         clearCart();
 
         navigate(
           getTenantPath(`/quotation/${editingQuotationId}`)
         );
       } else {
-        // 'new' or 'reorder' both create a brand new quotation
-        const { quotation } = await createQuotation({
-          shopOwnerId,
-          customerId: session.user.id,
-          customerEmail: session.user.email,
-          items,
-        });
+  // 'new' or 'reorder' both create a brand new quotation
+ const { quotation } = await createQuotation({
+  shopOwnerId,
+  customerId: session.user.id,
+  customerEmail: session.user.email,
+  items,
+  remarks: remarks.trim(),
+});
 
-        clearCart();
+const quotationPath =
+  getTenantPath(`/quotation/${quotation.id}`);
 
-        navigate(
-          getTenantPath(`/quotation/${quotation.id}`)
-        );
-      }
+const quotationUrl =
+  `${window.location.origin}${quotationPath}`;
+
+const whatsappNumber =
+  tenant?.notifications?.whatsappNumber || tenant?.whatsapp || '';
+
+const whatsappEnabled =
+  tenant?.notifications?.notifyWhatsapp === true && Boolean(whatsappNumber);
+
+const link = whatsappEnabled
+  ? createWhatsAppQuotationLink({
+      phone: whatsappNumber,
+      customerName: quotation.customer_name || 'Customer',
+      quotationNo: quotation.quotation_no || '',
+      totalAmount: quotation.total_amount || 0,
+      quotationUrl,
+      currencySymbol: tenant?.currencySymbol || 'PKR',
+    })
+  : '';
+
+setWhatsappLink(link);
+
+clearCart();
+
+setShowWhatsappPopup(true);
+  
+}
     } catch (err) {
       setError(
         err.message ||
@@ -140,7 +199,8 @@ function CartPage() {
       : 'Submit Quotation';
 
   if (items.length === 0) {
-    return (
+  return (
+    <>
       <section className="page-card">
         <p className="eyebrow">Cart</p>
         <h1>Your cart is empty</h1>
@@ -154,8 +214,99 @@ function CartPage() {
           </Link>
         </p>
       </section>
-    );
-  }
+
+      {showWhatsappPopup && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem',
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '420px',
+              backgroundColor: '#ffffff',
+              borderRadius: '16px',
+              padding: '2rem',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.2)',
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '2.5rem',
+                marginBottom: '0.75rem',
+              }}
+            >
+              🎉
+            </div>
+
+            <h2 style={{ marginTop: 0 }}>
+              Quotation Submitted
+            </h2>
+
+            <p>
+              Your quotation has been successfully
+              submitted.
+            </p>
+
+            <p>
+              {whatsappEnabled
+                ? 'Would you like to notify the shopkeeper about your quotation on WhatsApp?'
+                : 'Your quotation was submitted successfully.'}
+            </p>
+
+            <p
+              style={{
+                fontSize: '0.9rem',
+                color: '#64748b',
+                marginBottom: '1.5rem',
+              }}
+            >
+              {whatsappEnabled
+                ? 'WhatsApp will open with a prepared message. You can review it and press Send.'
+                : 'You can view it in your quotations or continue shopping.'}
+            </p>
+
+            <div
+              style={{
+                display: 'flex',
+                gap: '0.75rem',
+                justifyContent: 'center',
+                flexWrap: 'wrap',
+              }}
+            >
+              {whatsappEnabled ? (
+                <button
+                  type="button"
+                  className="header-button primary"
+                  onClick={handleWhatsappNotify}
+                >
+                  📱 Yes, Notify
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                className="header-button primary"
+                onClick={handleSkipWhatsapp}
+              >
+                No, Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
   return (
     <section className="page-card">
@@ -423,6 +574,36 @@ function CartPage() {
         </p>
       )}
 
+
+<div style={{ marginTop: '2rem' }}>
+  <label
+    htmlFor="quotation-remarks"
+    style={{
+      display: 'block',
+      fontWeight: '600',
+      marginBottom: '0.5rem',
+    }}
+  >
+    Remarks
+  </label>
+
+  <textarea
+    id="quotation-remarks"
+    value={remarks}
+    onChange={(event) => setRemarks(event.target.value)}
+    placeholder="Add any remarks or special instructions..."
+    rows={4}
+    style={{
+      width: '100%',
+      padding: '0.75rem',
+      border: '1px solid #cbd5e1',
+      borderRadius: '8px',
+      resize: 'vertical',
+      fontFamily: 'inherit',
+      boxSizing: 'border-box',
+    }}
+  />
+</div>     
       <div
         style={{
           display: 'flex',
@@ -433,6 +614,7 @@ function CartPage() {
           borderTop: '2px solid #e2e8f0',
         }}
       >
+        
         <h2>
           Grand Total: {formatCurrency(totalAmount)}
         </h2>

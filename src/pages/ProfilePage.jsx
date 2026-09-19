@@ -208,9 +208,7 @@ function ProfilePage() {
     setSuccess('');
   };
 
-  // -----------------------------------------
-  // LOADING
-  // -----------------------------------------
+
   if (isLoading) {
     return (
       <section className="page-card">
@@ -225,14 +223,8 @@ function ProfilePage() {
     );
   }
 
-  // -----------------------------------------
-  // ERROR WHILE LOADING
-  // -----------------------------------------
   if (error && !profile && !fullName && !phone) {
-    // Only show this as a full-page error when
-    // there is an actual error.
-    //
-    // A missing profile is NOT an error.
+
     if (error !== '') {
       return (
         <section className="page-card">
@@ -259,7 +251,7 @@ function ProfilePage() {
         <h1>Create Your Profile</h1>
 
         <p>
-          Please enter your name and phone number.
+          Please enter your name, phone, city and cargo compny.
           Your email is already linked to your
           account.
         </p>
@@ -325,6 +317,33 @@ function ProfilePage() {
                 setPhone(event.target.value)
               }
               placeholder="03XX-XXXXXXX"
+              disabled={isSaving}
+            />
+          </label>
+          <label className="field">
+            <span>City</span>
+
+            <input
+              type="text"
+              value={city}
+              onChange={(event) =>
+                setCity(event.target.value)
+              }
+              placeholder="City name"
+              disabled={isSaving}
+            />
+          </label>
+
+          <label className="field">
+            <span>Cargo Company</span>
+
+            <input
+              type="text"
+              value={cargo}
+              onChange={(event) =>
+                setCargo(event.target.value)
+              }
+              placeholder="Cargo Company"
               disabled={isSaving}
             />
           </label>
@@ -501,6 +520,24 @@ function ProfilePage() {
               setPhone(event.target.value)
             }
             placeholder="03XX-XXXXXXX"
+            disabled={isSaving}
+          />
+          <input
+            type="text"
+            value={city}
+            onChange={(event) =>
+              setCity(event.target.value)
+            }
+            placeholder="Your City"
+            disabled={isSaving}
+          />
+           <input
+            type="text"
+            value={cargo}
+            onChange={(event) =>
+              setCargo(event.target.value)
+            }
+            placeholder="Cargo Company"
             disabled={isSaving}
           />
         </label>

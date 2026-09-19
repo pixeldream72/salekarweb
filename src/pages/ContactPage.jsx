@@ -6,6 +6,8 @@ function ContactPage() {
   const tenant = useTenant();
   const { getTenantPath } = useTenantPath();
 
+   console.log("email",tenant.email)
+
   return (
     <section className="page-card">
       <p className="eyebrow">Contact</p>
@@ -55,19 +57,23 @@ function ContactPage() {
             {tenant.email && (
               <li>
                 <strong>Email</strong>
+                
                 <span>
                   <a
                     href={`mailto:${tenant.email}`}
                     style={{ color: 'inherit' }}
                   >
                     {tenant.email}
+                    
                   </a>
                 </span>
               </li>
+              
             )}
+            
           </ul>
         </article>
-
+       
         {(tenant.address || tenant.city) && (
           <article className="info-card">
             <h3>Location</h3>

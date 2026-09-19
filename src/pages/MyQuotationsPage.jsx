@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchQuotations } from '../services/supabaseService.js';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import { useAuth , } from '../contexts/AuthContext.jsx';
 import { useTenantPath } from '../hooks/useTenantPath.js';
+import { useTenant } from '../contexts/TenantContext.jsx';
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('en-PK', {
@@ -27,8 +28,10 @@ function formatDate(value) {
 function MyQuotationsPage() {
   const { session } = useAuth();
   const { getTenantPath } = useTenantPath();
-
+    const tenant = useTenant();
+   const {shopOwnerId} = tenant;
   const customerId = session?.user?.id;
+
 
   const [quotations, setQuotations] = useState([]);
   const [source, setSource] = useState('loading');
@@ -37,7 +40,7 @@ function MyQuotationsPage() {
     let isMounted = true;
 
     const loadQuotations = async () => {
-      const result = await fetchQuotations(customerId);
+      const result = await fetchQuotations(customerId,shopOwnerId);
 
       if (!isMounted) {
         return;
@@ -52,7 +55,7 @@ function MyQuotationsPage() {
     return () => {
       isMounted = false;
     };
-  }, [customerId]);
+  }, [customerId,shopOwnerId]);
 
   return (
     <section className="page-card">

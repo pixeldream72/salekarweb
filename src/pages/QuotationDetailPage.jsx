@@ -29,6 +29,7 @@ function QuotationDetailPage() {
   const { loadQuotationForEditing, loadQuotationForReorder } = useCart();
   const navigate = useNavigate();
   const customerId = session?.user?.id;
+ 
 
   const [quote, setQuote] = useState(null);
 
@@ -60,7 +61,7 @@ function QuotationDetailPage() {
   const isPending = quote.status === 'pending';
 
   const handleEditInCart = () => {
-    loadQuotationForEditing(quote.id, quote.items);
+    loadQuotationForEditing(quote.id, quote.items, quote.remarks);
     navigate(getTenantPath('/cart'));
   };
 

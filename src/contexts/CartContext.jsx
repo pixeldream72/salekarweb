@@ -6,6 +6,7 @@ export function CartProvider({ children }) {
   const [items, setItems] = useState([]);
   const [cartMode, setCartMode] = useState('new'); // 'new' | 'editing' | 'reorder'
   const [editingQuotationId, setEditingQuotationId] = useState(null);
+  const [editingRemarks, setEditingRemarks] = useState('');
 
   const addToCart = (product, quantity = 1) => {
     setItems((current) => {
@@ -46,6 +47,7 @@ export function CartProvider({ children }) {
     setItems([]);
     setCartMode('new');
     setEditingQuotationId(null);
+    setEditingRemarks('');
   };
 
   const itemsFromQuotation = (quotationItems) =>
@@ -63,10 +65,11 @@ export function CartProvider({ children }) {
     }));
 
   // For editing a PENDING quotation — will UPDATE the existing row
-  const loadQuotationForEditing = (quotationId, quotationItems) => {
+  const loadQuotationForEditing = (quotationId, quotationItems, remarks = '') => {
     setItems(itemsFromQuotation(quotationItems));
     setCartMode('editing');
     setEditingQuotationId(quotationId);
+    setEditingRemarks(remarks || '');
   };
 
   // For reordering a PAST quotation — will CREATE a brand new row
@@ -74,6 +77,7 @@ export function CartProvider({ children }) {
     setItems(itemsFromQuotation(quotationItems));
     setCartMode('reorder');
     setEditingQuotationId(null);
+    setEditingRemarks('');
   };
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -89,6 +93,7 @@ export function CartProvider({ children }) {
     totalAmount,
     cartMode,
     editingQuotationId,
+    editingRemarks,
     loadQuotationForEditing,
     loadQuotationForReorder,
   };
