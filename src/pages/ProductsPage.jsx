@@ -144,21 +144,116 @@ function buildProductPlaceholderImage(name = 'Product', itemCode = '') {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+// Keeps the typed text in a local "draft" so the quantity field can be
+// cleared and retyped from the keyboard. When the item is already in the
+// cart, typing a number above 0 updates the cart live. Clearing the field is
+// allowed while typing and is resolved on blur: empty reverts to the current
+// quantity, and 0 removes the item from the cart.
+function useQuantityInput({
+  isInCart,
+  quantityInCart,
+  quantity,
+  setQuantity,
+  onCartUpdate,
+  onCartRemove,
+}) {
+  const [draft, setDraft] = useState(null);
+
+  const value = draft !== null ? draft : String(isInCart ? quantityInCart : quantity);
+
+  const onChange = (event) => {
+    const raw = event.target.value;
+
+    // Digits only (or empty, so the field can be cleared).
+    if (raw !== '' && !/^\d+$/.test(raw)) {
+      return;
+    }
+
+    setDraft(raw);
+
+    if (raw === '') {
+      return; // wait for the user to type something
+    }
+
+    const parsed = parseInt(raw, 10);
+
+    if (isInCart) {
+      if (parsed > 0) onCartUpdate(parsed);
+    } else {
+      setQuantity(parsed);
+    }
+  };
+
+  const onBlur = () => {
+    if (draft === null) return;
+
+    if (isInCart) {
+      if (draft !== '' && parseInt(draft, 10) === 0) {
+        onCartRemove();
+      }
+    } else if (draft === '') {
+      setQuantity(1);
+    }
+
+    setDraft(null);
+  };
+
+  const onFocus = (event) => event.target.select();
+
+  const decrease = () => {
+    setDraft(null);
+
+    if (isInCart) {
+      if (quantityInCart <= 1) onCartRemove();
+      else onCartUpdate(quantityInCart - 1);
+    } else {
+      setQuantity((current) => Math.max(0, current - 1));
+    }
+  };
+
+  const increase = () => {
+    setDraft(null);
+
+    if (isInCart) onCartUpdate(quantityInCart + 1);
+    else setQuantity((current) => current + 1);
+  };
+
+  return {
+    value,
+    onChange,
+    onBlur,
+    onFocus,
+    decrease,
+    increase,
+    resetDraft: () => setDraft(null),
+  };
+}
+
 function VariantRow({ variant }) {
-  const { items, addToCart } = useCart();
+  const { items, addToCart, updateQuantity, removeFromCart } = useCart();
   const [quantity, setQuantity] = useState(1);
 
   const cartItem = items.find((item) => item.product.id === variant.id);
   const quantityInCart = cartItem ? cartItem.quantity : 0;
+  const isInCart = quantityInCart > 0;
 
-  const handleDecrease = () => setQuantity((current) => Math.max(0, current - 1));
-  const handleIncrease = () => setQuantity((current) => current + 1);
+  const qty = useQuantityInput({
+    isInCart,
+    quantityInCart,
+    quantity,
+    setQuantity,
+    onCartUpdate: (n) => updateQuantity(variant.id, n),
+    onCartRemove: () => removeFromCart(variant.id),
+  });
+
   const handleAdd = () => {
     if (quantity <= 0) {
       return;
     }
 
+    qty.resetDraft();
     addToCart(variant, quantity);
+    setQuantity(1);
   };
 
   return (
@@ -181,34 +276,32 @@ function VariantRow({ variant }) {
       </span>
 
       <div className="variant-controls" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <button type="button" onClick={handleDecrease} style={{ width: '32px' }}>-</button>
+        <button type="button" onClick={qty.decrease} style={{ width: '32px' }}>
+          -
+        </button>
         <input
-          type="number"
-          min="0"
-          value={quantity}
-          onChange={(event) => {
-            const nextValue = event.target.value;
-
-            if (nextValue === '') {
-              setQuantity(0);
-              return;
-            }
-
-            const parsedValue = Number(nextValue);
-            setQuantity(Number.isFinite(parsedValue) && parsedValue >= 0 ? parsedValue : 0);
-          }}
+          type="text"
+          inputMode="numeric"
+          value={qty.value}
+          onChange={qty.onChange}
+          onBlur={qty.onBlur}
+          onFocus={qty.onFocus}
           style={{ width: '50px', textAlign: 'center' }}
         />
-        <button type="button" onClick={handleIncrease} style={{ width: '32px' }}>+</button>
+        <button type="button" onClick={qty.increase} style={{ width: '32px' }}>
+          +
+        </button>
       </div>
 
-      <button type="button" className="header-button primary" onClick={handleAdd}>
-        Add to Cart
+      <button
+        type="button"
+        className="header-button primary"
+        onClick={handleAdd}
+        disabled={isInCart}
+        style={isInCart ? { backgroundColor: '#94a3b8', borderColor: '#94a3b8', cursor: 'default' } : undefined}
+      >
+        {isInCart ? 'Added to Cart' : 'Add to Cart'}
       </button>
-
-      {quantityInCart > 0 && (
-        <span className="cart-count-pill" style={{ color: '#16a34a', fontWeight: 'bold' }}>✓ {quantityInCart} in cart</span>
-      )}
     </div>
   );
 }
@@ -218,13 +311,17 @@ function VariantRow({ variant }) {
 // if there are many). The selected variant's price + qty + add-to-cart sit
 // in a bar directly under the image.
 function ProductGridCard({ group, onPreview }) {
-  const { items, addToCart } = useCart();
+  const { items, addToCart, updateQuantity, removeFromCart } = useCart();
   const [selectedVariantId, setSelectedVariantId] = useState(group.variants[0]?.id);
   const [quantity, setQuantity] = useState(1);
   const variantDrag = useDragScroll();
 
   const selectedVariant =
     group.variants.find((v) => v.id === selectedVariantId) || group.variants[0];
+
+  const selectedCartItem = items.find((item) => item.product.id === selectedVariant.id);
+  const selectedQuantityInCart = selectedCartItem ? selectedCartItem.quantity : 0;
+  const isSelectedInCart = selectedQuantityInCart > 0;
 
   const cartVariants = group.variants
     .map((variant) => {
@@ -235,19 +332,29 @@ function ProductGridCard({ group, onPreview }) {
 
   const previewSource = group.imageUrl || buildProductPlaceholderImage(group.name, group.itemCode);
 
+  const qty = useQuantityInput({
+    isInCart: isSelectedInCart,
+    quantityInCart: selectedQuantityInCart,
+    quantity,
+    setQuantity,
+    onCartUpdate: (n) => updateQuantity(selectedVariant.id, n),
+    onCartRemove: () => removeFromCart(selectedVariant.id),
+  });
+
   const handleSelectVariant = (variantId) => {
+    qty.resetDraft();
     setSelectedVariantId(variantId);
     setQuantity(1);
   };
 
-  const handleDecrease = () => setQuantity((current) => Math.max(0, current - 1));
-  const handleIncrease = () => setQuantity((current) => current + 1);
   const handleAdd = () => {
     if (quantity <= 0) {
       return;
     }
 
+    qty.resetDraft();
     addToCart(selectedVariant, quantity);
+    setQuantity(1);
   };
 
   return (
@@ -406,33 +513,34 @@ function ProductGridCard({ group, onPreview }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <button type="button" onClick={handleDecrease} style={{ width: '32px', height: '32px' }}>-</button>
+          <button type="button" onClick={qty.decrease} style={{ width: '32px', height: '32px' }}>
+            -
+          </button>
           <input
-            type="number"
-            min="0"
-            value={quantity}
-            onChange={(event) => {
-              const nextValue = event.target.value;
-
-              if (nextValue === '') {
-                setQuantity(0);
-                return;
-              }
-
-              const parsedValue = Number(nextValue);
-              setQuantity(Number.isFinite(parsedValue) && parsedValue >= 0 ? parsedValue : 0);
-            }}
+            type="text"
+            inputMode="numeric"
+            value={qty.value}
+            onChange={qty.onChange}
+            onBlur={qty.onBlur}
+            onFocus={qty.onFocus}
             style={{ width: '50px', height: '32px', textAlign: 'center' }}
           />
-          <button type="button" onClick={handleIncrease} style={{ width: '32px', height: '32px' }}>+</button>
+          <button type="button" onClick={qty.increase} style={{ width: '32px', height: '32px' }}>
+            +
+          </button>
 
           <button
             type="button"
             className="header-button primary grid-add-to-cart"
             onClick={handleAdd}
-            style={{ flex: 1, minWidth: '110px' }}
+            disabled={isSelectedInCart}
+            style={{
+              flex: 1,
+              minWidth: '110px',
+              ...(isSelectedInCart ? { backgroundColor: '#94a3b8', borderColor: '#94a3b8', cursor: 'default' } : {}),
+            }}
           >
-            Add to Cart
+            {isSelectedInCart ? 'Added to Cart' : 'Add to Cart'}
           </button>
         </div>
       </div>
