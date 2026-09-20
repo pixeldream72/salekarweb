@@ -40,10 +40,7 @@ function ProfilePage() {
       setError('');
       setSuccess('');
 
-      console.log(
-        'Loading customer profile for:',
-        customerId
-      );
+      
 
       const { data, error: profileError } =
         await fetchCustomerProfile(customerId);
@@ -52,11 +49,7 @@ function ProfilePage() {
         return;
       }
 
-      console.log('Customer profile:', data);
-      console.log(
-        'Customer profile error:',
-        profileError
-      );
+     
 
       if (profileError) {
         setError(profileError.message);
@@ -64,10 +57,7 @@ function ProfilePage() {
         return;
       }
 
-      // -----------------------------------------
-      // Profile does not exist.
-      // This is OK. User can create it.
-      // -----------------------------------------
+     
       if (!data) {
         setProfile(null);
         setFullName('');

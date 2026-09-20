@@ -6,7 +6,7 @@ function ContactPage() {
   const tenant = useTenant();
   const { getTenantPath } = useTenantPath();
 
-   console.log("email",tenant.email)
+   
 
   return (
     <section className="page-card">

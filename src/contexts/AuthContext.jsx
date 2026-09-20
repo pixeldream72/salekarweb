@@ -21,7 +21,7 @@ export function AuthProvider({ children }) {
       }
 
       if (error) {
-        console.error('Failed to fetch Supabase session:', error.message);
+        
       }
 
       setSession(currentSession);

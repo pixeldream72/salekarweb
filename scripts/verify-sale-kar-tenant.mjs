@@ -18,7 +18,6 @@ const url = envMap.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const key = envMap.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 if (!url || !key) {
-  console.log('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in .env');
   process.exit(1);
 }
 
@@ -39,10 +38,4 @@ const { data: productRows, error: productError } = await supabase
   .select('id, name, price, description, shop_owner_id, owner_id, user_id, tenant_id')
   .limit(20);
 
-console.log('BusinessDetail error:', businessError ? businessError.message : 'none');
-console.log('BusinessDetail rows:', businessRows?.length ?? 0);
-console.log(JSON.stringify(businessRows, null, 2));
 
-console.log('\nproducts error:', productError ? productError.message : 'none');
-console.log('products rows:', productRows?.length ?? 0);
-console.log(JSON.stringify(productRows, null, 2));

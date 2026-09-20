@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTenant } from '../contexts/TenantContext.jsx';
 import { useCart } from '../contexts/CartContext.jsx';
 import { fetchProducts } from '../services/supabaseService.js';
@@ -6,7 +6,6 @@ import { useTenantPath } from '../hooks/useTenantPath.js';
 
 function groupProductsByItemCode(products) {
   const groups = {};
-  
 
   products.forEach((product) => {
     const key = product.item_code || 'uncategorized';
@@ -16,9 +15,14 @@ function groupProductsByItemCode(products) {
         itemCode: key,
         name: product.name,
         category: product.category,
-        imageUrl: product.imageUrl, // NEW
+        imageUrl: product.imageUrl,
+        createdDate: product.created_date,
         variants: [],
       };
+    }
+
+    if (product.created_date && (!groups[key].createdDate || product.created_date > groups[key].createdDate)) {
+      groups[key].createdDate = product.created_date;
     }
 
     groups[key].variants.push(product);
@@ -43,9 +47,77 @@ function filterGroups(groups, searchTerm, selectedCategory) {
   });
 }
 
+function sortGroups(groups, sortOrder) {
+  const sorted = [...groups];
+
+  sorted.sort((a, b) => {
+    const aDate = a.createdDate ? new Date(a.createdDate).getTime() : 0;
+    const bDate = b.createdDate ? new Date(b.createdDate).getTime() : 0;
+
+    return sortOrder === 'newest' ? bDate - aDate : aDate - bDate;
+  });
+
+  return sorted;
+}
+
 function getUniqueCategories(products) {
   const categories = new Set(products.map((p) => p.category || 'Uncategorized'));
   return ['All', ...Array.from(categories)];
+}
+
+// Lets a normal vertical mouse wheel scroll a horizontal row (desktop UX);
+// touch/swipe already works natively on mobile without this.
+function handleHorizontalWheel(event) {
+  if (event.deltaY === 0) {
+    return;
+  }
+
+  const el = event.currentTarget;
+  const canScroll = el.scrollWidth > el.clientWidth;
+
+  if (!canScroll) {
+    return;
+  }
+
+  el.scrollLeft += event.deltaY;
+  event.preventDefault();
+}
+
+// Click-and-drag horizontal scrolling for desktop mice (mobile keeps native
+// touch/swipe scrolling, unaffected by this). Spread the returned handlers
+// onto the scrollable element along with its ref.
+function useDragScroll() {
+  const ref = useRef(null);
+  const dragState = useRef({ isDown: false, startX: 0, scrollLeft: 0 });
+
+  const onMouseDown = (event) => {
+    const el = ref.current;
+    if (!el) return;
+    dragState.current.isDown = true;
+    dragState.current.startX = event.pageX - el.offsetLeft;
+    dragState.current.scrollLeft = el.scrollLeft;
+  };
+
+  const stopDragging = () => {
+    dragState.current.isDown = false;
+  };
+
+  const onMouseMove = (event) => {
+    const el = ref.current;
+    if (!dragState.current.isDown || !el) return;
+    event.preventDefault();
+    const x = event.pageX - el.offsetLeft;
+    const walk = x - dragState.current.startX;
+    el.scrollLeft = dragState.current.scrollLeft - walk;
+  };
+
+  return {
+    ref,
+    onMouseDown,
+    onMouseUp: stopDragging,
+    onMouseLeave: stopDragging,
+    onMouseMove,
+  };
 }
 
 function buildProductPlaceholderImage(name = 'Product', itemCode = '') {
@@ -72,9 +144,6 @@ function buildProductPlaceholderImage(name = 'Product', itemCode = '') {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-// NEW: a single variant row, as its OWN small component
-// This is like extracting a ViewHolder's binding logic into its own class in Android —
-// each row manages its own local "how many to add" state independently.
 function VariantRow({ variant }) {
   const { items, addToCart } = useCart();
   const [quantity, setQuantity] = useState(1);
@@ -92,7 +161,7 @@ function VariantRow({ variant }) {
     addToCart(variant, quantity);
   };
 
-    return (
+  return (
     <div
       className="variant-row"
       style={{
@@ -142,20 +211,260 @@ function VariantRow({ variant }) {
       )}
     </div>
   );
+}
 
+// Grid card: product image as the full background, with variant color
+// dots overlaid at the bottom of the image (tap to select, scroll horizontally
+// if there are many). The selected variant's price + qty + add-to-cart sit
+// in a bar directly under the image.
+function ProductGridCard({ group, onPreview }) {
+  const { items, addToCart } = useCart();
+  const [selectedVariantId, setSelectedVariantId] = useState(group.variants[0]?.id);
+  const [quantity, setQuantity] = useState(1);
+  const variantDrag = useDragScroll();
 
+  const selectedVariant =
+    group.variants.find((v) => v.id === selectedVariantId) || group.variants[0];
 
+  const cartVariants = group.variants
+    .map((variant) => {
+      const cartItem = items.find((item) => item.product.id === variant.id);
+      return cartItem ? { color: variant.color || 'Default', qty: cartItem.quantity } : null;
+    })
+    .filter(Boolean);
+
+  const previewSource = group.imageUrl || buildProductPlaceholderImage(group.name, group.itemCode);
+
+  const handleSelectVariant = (variantId) => {
+    setSelectedVariantId(variantId);
+    setQuantity(1);
+  };
+
+  const handleDecrease = () => setQuantity((current) => Math.max(0, current - 1));
+  const handleIncrease = () => setQuantity((current) => current + 1);
+  const handleAdd = () => {
+    if (quantity <= 0) {
+      return;
+    }
+
+    addToCart(selectedVariant, quantity);
+  };
+
+  return (
+    <div
+      className="product-grid-card"
+      style={{
+        border: '1px solid #e2e8f0',
+        borderRadius: '10px',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: '#fff',
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          aspectRatio: '1 / 1',
+          backgroundImage: `url("${previewSource}")`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          cursor: 'pointer',
+        }}
+        onClick={() => onPreview(previewSource)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onPreview(previewSource);
+          }
+        }}
+        tabIndex={0}
+        role="button"
+        aria-label={`Preview image for ${group.name}`}
+      >
+        {cartVariants.length > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              right: '0.5rem',
+              bottom: '0.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+              gap: '0.25rem',
+              maxWidth: 'calc(100% - 1rem)',
+            }}
+          >
+            {cartVariants.map((entry) => (
+              <span
+                key={entry.color}
+                style={{
+                  backgroundColor: 'rgba(22, 163, 74, 0.92)',
+                  color: '#fff',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  padding: '0.25rem 0.55rem',
+                  borderRadius: '999px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  maxWidth: '100%',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+                }}
+              >
+                <span>✓</span>
+                <span>{entry.qty}</span>
+                <span
+                  style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {entry.color}
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: 0 }}>
+        <h3 style={{ margin: 0, fontSize: '0.95rem' }}>
+          {group.name} <small style={{ color: '#64748b' }}>({group.itemCode})</small>
+        </h3>
+
+        {group.variants.length > 1 && (
+          <div
+            ref={variantDrag.ref}
+            onWheel={handleHorizontalWheel}
+            onMouseDown={variantDrag.onMouseDown}
+            onMouseUp={variantDrag.onMouseUp}
+            onMouseLeave={variantDrag.onMouseLeave}
+            onMouseMove={variantDrag.onMouseMove}
+            style={{
+              display: 'flex',
+              gap: '0.4rem',
+              overflowX: 'auto',
+              flexWrap: 'nowrap',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+              WebkitOverflowScrolling: 'touch',
+              paddingBottom: '0.15rem',
+              minWidth: 0,
+              maxWidth: '100%',
+              cursor: 'grab',
+              userSelect: 'none',
+            }}
+          >
+            {group.variants.map((variant) => {
+              const isSelected = variant.id === selectedVariant.id;
+
+              return (
+                <button
+                  key={variant.id}
+                  type="button"
+                  className="grid-variant-pill"
+                  onClick={() => handleSelectVariant(variant.id)}
+                  style={{
+                    flexShrink: 0,
+                    whiteSpace: 'nowrap',
+                    padding: '0.3rem 0.7rem',
+                    borderRadius: '999px',
+                    border: isSelected ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                    backgroundColor: isSelected ? '#2563eb' : 'white',
+                    color: isSelected ? 'white' : '#334155',
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {variant.color || 'Default'}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '0.5rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          <span style={{ fontSize: '0.9rem', color: '#334155' }}>
+            {selectedVariant.color || 'Default'}
+            <strong style={{ marginLeft: '0.5rem' }}>
+              PKR {selectedVariant.price}
+              {selectedVariant.unit ? <span style={{ color: '#64748b', fontWeight: 400 }}>/{selectedVariant.unit}</span> : null}
+            </strong>
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <button type="button" onClick={handleDecrease} style={{ width: '32px', height: '32px' }}>-</button>
+          <input
+            type="number"
+            min="0"
+            value={quantity}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+
+              if (nextValue === '') {
+                setQuantity(0);
+                return;
+              }
+
+              const parsedValue = Number(nextValue);
+              setQuantity(Number.isFinite(parsedValue) && parsedValue >= 0 ? parsedValue : 0);
+            }}
+            style={{ width: '50px', height: '32px', textAlign: 'center' }}
+          />
+          <button type="button" onClick={handleIncrease} style={{ width: '32px', height: '32px' }}>+</button>
+
+          <button
+            type="button"
+            className="header-button primary grid-add-to-cart"
+            onClick={handleAdd}
+            style={{ flex: 1, minWidth: '110px' }}
+          >
+            Add to Cart
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ProductsPage() {
   const { shopOwnerId } = useTenant();
-   const { getTenantPath } = useTenantPath();
+  const { getTenantPath } = useTenantPath();
   const [products, setProducts] = useState([]);
   const [source, setSource] = useState('loading');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [previewImage, setPreviewImage] = useState(null);
- 
+  const [viewMode, setViewMode] = useState(() => {
+    if (typeof window === 'undefined') return 'grid';
+    return localStorage.getItem('products_view_mode') || 'grid';
+  }); // 'list' | 'grid'
+  const [sortOrder, setSortOrder] = useState(() => {
+    if (typeof window === 'undefined') return 'newest';
+    return localStorage.getItem('products_sort_order') || 'newest';
+  }); // 'newest' | 'oldest'
+
+  useEffect(() => {
+    localStorage.setItem('products_view_mode', viewMode);
+  }, [viewMode]);
+
+  useEffect(() => {
+    localStorage.setItem('products_sort_order', sortOrder);
+  }, [sortOrder]);
+  const categoryDrag = useDragScroll();
 
   useEffect(() => {
     let isMounted = true;
@@ -182,13 +491,121 @@ function ProductsPage() {
 
   const groupedProducts = useMemo(() => {
     const groups = groupProductsByItemCode(products);
-    return filterGroups(groups, searchTerm, selectedCategory);
-  }, [products, searchTerm, selectedCategory]);
+    const filtered = filterGroups(groups, searchTerm, selectedCategory);
+    return sortGroups(filtered, sortOrder);
+  }, [products, searchTerm, selectedCategory, sortOrder]);
 
   return (
     <section className="page-card">
-      <p className="eyebrow">Products</p>
-      <h1>Products</h1>
+      <style>{`
+        .products-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 1rem;
+        }
+        @media (min-width: 641px) {
+          .products-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+        @media (min-width: 1024px) {
+          .products-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+        @media (min-width: 1400px) {
+          .products-grid {
+            grid-template-columns: repeat(4, 1fr);
+          }
+        }
+        @media (max-width: 640px) {
+          .grid-variant-pill {
+            padding: 0.2rem 0.5rem !important;
+            font-size: 0.7rem !important;
+          }
+          .grid-add-to-cart {
+            padding: 0.75rem !important;
+            font-size: 1rem !important;
+            min-height: 44px;
+          }
+        }
+      `}</style>
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+        }}
+      >
+        <div>
+          <p className="eyebrow">Products</p>
+          <h1 style={{ margin: 0 }}>Products</h1>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <button
+            type="button"
+            onClick={() => setSortOrder((current) => (current === 'newest' ? 'oldest' : 'newest'))}
+            title={sortOrder === 'newest' ? 'Newest first' : 'Oldest first'}
+            aria-label="Toggle sort order"
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '8px',
+              border: '1px solid #cbd5e1',
+              backgroundColor: 'white',
+              cursor: 'pointer',
+              fontSize: '1rem',
+            }}
+          >
+            {sortOrder === 'newest' ? '⇓' : '⇑'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            disabled={viewMode === 'list'}
+            aria-label="List view"
+            title="List view"
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '8px',
+              border: '1px solid #2563eb',
+              backgroundColor: viewMode === 'list' ? '#2563eb' : 'white',
+              color: viewMode === 'list' ? 'white' : '#2563eb',
+              cursor: viewMode === 'list' ? 'default' : 'pointer',
+              fontSize: '1rem',
+            }}
+          >
+            ☰
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode('grid')}
+            disabled={viewMode === 'grid'}
+            aria-label="Grid view"
+            title="Grid view"
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '8px',
+              border: '1px solid #2563eb',
+              backgroundColor: viewMode === 'grid' ? '#2563eb' : 'white',
+              color: viewMode === 'grid' ? 'white' : '#2563eb',
+              cursor: viewMode === 'grid' ? 'default' : 'pointer',
+              fontSize: '1rem',
+            }}
+          >
+            ⊞
+          </button>
+        </div>
+      </div>
+
       <p>
         {source === 'loading' && 'Loading products...'}
         {source === 'supabase' && 'Live Supabase data.'}
@@ -207,14 +624,24 @@ function ProductsPage() {
 
       <div
         className="category-row"
+        ref={categoryDrag.ref}
+        onWheel={handleHorizontalWheel}
+        onMouseDown={categoryDrag.onMouseDown}
+        onMouseUp={categoryDrag.onMouseUp}
+        onMouseLeave={categoryDrag.onMouseLeave}
+        onMouseMove={categoryDrag.onMouseMove}
         style={{
           display: 'flex',
           gap: '0.5rem',
           marginBottom: '1.5rem',
           overflowX: 'auto',
-          whiteSpace: 'nowrap',
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
+          WebkitOverflowScrolling: 'touch',
+          minWidth: 0,
+          maxWidth: '100%',
+          cursor: 'grab',
+          userSelect: 'none',
         }}
       >
         {categories.map((category) => (
@@ -239,6 +666,12 @@ function ProductsPage() {
 
       {groupedProducts.length === 0 ? (
         <p style={{ marginTop: '1rem', color: '#64748b' }}>No products match your search.</p>
+      ) : viewMode === 'grid' ? (
+        <div className="products-grid">
+          {groupedProducts.map((group) => (
+            <ProductGridCard key={group.itemCode} group={group} onPreview={setPreviewImage} />
+          ))}
+        </div>
       ) : (
         groupedProducts.map((group) => {
           const previewSource = group.imageUrl || buildProductPlaceholderImage(group.name, group.itemCode);

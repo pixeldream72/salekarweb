@@ -48,12 +48,6 @@ export function TenantProvider({ children }) {
           : '';
 
       const pathname = location.pathname || '';
-
-      console.log('--------------------------------');
-      console.log('TENANT RESOLUTION START');
-      console.log('Hostname:', hostname);
-      console.log('Pathname:', pathname);
-
       if (isActive) {
         setTenant({
           ...EMPTY_TENANT,
@@ -86,75 +80,29 @@ export function TenantProvider({ children }) {
         let tenantSlug = '';
 
         if (pathSegment) {
-          console.log('Path tenant:', pathSegment);
-
-          /*
-           * -----------------------------------------
-           * 1A. UUID in path
-           * -----------------------------------------
-           *
-           * This is kept for backward compatibility.
-           *
-           * Example:
-           * /550e8400-e29b-41d4-a716-446655440000
-           */
-
+    
           if (isValidUuid(pathSegment)) {
             resolvedShopOwnerId = pathSegment;
             source = 'path-uuid';
 
-            console.log(
-              'Using UUID from path:',
-              resolvedShopOwnerId
-            );
+            
           }
-
-          /*
-           * -----------------------------------------
-           * 1B. Slug in path
-           * -----------------------------------------
-           *
-           * Normal new URL:
-           *
-           * /pd-traders
-           * /pd-traders/products
-           */
 
           else {
             tenantSlug = pathSegment;
-
-            console.log(
-              'Path is tenant slug. Resolving:',
-              tenantSlug
-            );
 
             resolvedShopOwnerId =
               await getShopOwnerIdBySlug(tenantSlug);
 
             source = 'path-slug';
 
-            console.log(
-              'Resolved slug → shopOwnerId:',
-              resolvedShopOwnerId
-            );
           }
         }
 
-        /*
-         * -----------------------------------------
-         * 2. If no path tenant, resolve hostname
-         * -----------------------------------------
-         *
-         * This is useful later for custom domains:
-         *
-         * pdtraders.com
-         */
+        
 
         if (!resolvedShopOwnerId) {
-          console.log(
-            'No path tenant. Resolving hostname:',
-            hostname
-          );
+        
 
           resolvedShopOwnerId =
             await resolveShopOwnerIdBySlugOrDomain(
@@ -164,10 +112,7 @@ export function TenantProvider({ children }) {
           if (resolvedShopOwnerId) {
             source = 'domain';
 
-            console.log(
-              'Resolved domain → shopOwnerId:',
-              resolvedShopOwnerId
-            );
+           
           }
         }
 
@@ -178,14 +123,7 @@ export function TenantProvider({ children }) {
          */
 
         if (!resolvedShopOwnerId) {
-          console.warn(
-            'TENANT NOT FOUND',
-            {
-              hostname,
-              pathname,
-              pathSegment,
-            }
-          );
+         
 
           if (!isActive) return;
 
@@ -224,16 +162,8 @@ export function TenantProvider({ children }) {
           isInvalidTenant: false,
         });
 
-        console.log(
-          'Fetching BusinessDetail:',
-          resolvedShopOwnerId
-        );
+       
 
-        /*
-         * -----------------------------------------
-         * 5. Load BusinessDetail
-         * -----------------------------------------
-         */
 
         const { data, error } =
           await fetchBusinessDetail(
@@ -243,10 +173,7 @@ export function TenantProvider({ children }) {
         if (!isActive) return;
 
         if (error) {
-          console.error(
-            'BusinessDetail fetch error:',
-            error
-          );
+        
 
           setTenant({
             ...EMPTY_TENANT,
@@ -290,10 +217,6 @@ export function TenantProvider({ children }) {
          * -----------------------------------------
          */
 
-        console.log(
-          'TENANT LOADED:',
-          data.businessName
-        );
 
         setTenant({
           ...data,

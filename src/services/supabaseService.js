@@ -96,12 +96,9 @@ export async function fetchBusinessDetail(
 ) {
   const fallback = getCurrentTenant();
 
-  console.log('========== BUSINESS DETAIL TEST ==========');
-  console.log('shopOwnerId being searched:', shopOwnerId);
-  console.log('fallback:', fallback);
 
   if (!shopOwnerId) {
-    console.log('❌ NO SHOP OWNER ID');
+   
     return { data: null, source: 'not_found', error: null };
   }
 
@@ -113,8 +110,7 @@ export async function fetchBusinessDetail(
     .eq('shop_owner_id', shopOwnerId)
     .limit(1);
 
-  console.log('Supabase BusinessDetail data:', data);
-  console.log('Supabase BusinessDetail error:', error);
+
 
   if (error) {
     console.error('❌ BusinessDetail lookup failed:', error);
@@ -123,24 +119,18 @@ export async function fetchBusinessDetail(
 
   const rows = Array.isArray(data) ? data : [];
 
-  console.log('Number of rows:', rows.length);
+ 
 
   if (!rows.length) {
-    console.log('❌ NO BusinessDetail ROW FOUND');
+    
     return { data: null, source: 'not_found', error: null };
   }
 
-  console.log('RAW BusinessDetail row:', rows[0]);
-  console.log('RAW basic_info:', rows[0].basic_info);
-  console.log('RAW businessName:', rows[0].basic_info?.businessName);
-  console.log('RAW ownerName:', rows[0].basic_info?.ownerName);
+
 
   const normalized = normalizeBusinessDetailRecord(rows[0], fallback);
 
-  console.log('NORMALIZED BusinessDetail:', normalized);
-  console.log('NORMALIZED businessName:', normalized.businessName);
-  console.log('NORMALIZED ownerName:', normalized.ownerName);
-  console.log('==========================================');
+
 
   return {
     data: normalized,
@@ -535,49 +525,12 @@ function normalizeBusinessDetailRecord(record, fallback) {
    * ---------------------------------------------------------
    */
 
-  console.log(
-    '========== WEBSITE SETTINGS DEBUG =========='
-  );
+  
 
-  console.log(
-    'RAW website_settings:',
-    record?.website_settings
-  );
+ 
 
-  console.log(
-    'PARSED websiteSettings:',
-    websiteSettings
-  );
 
-  console.log(
-    'PARSED notifications:',
-    notifications
-  );
 
-  console.log(
-    'notifyWhatsapp:',
-    notifications.notifyWhatsapp
-  );
-
-  console.log(
-    'whatsappNumber:',
-    notifications.whatsappNumber
-  );
-
-  console.log(
-    'NORMALIZED shopOwnerId:',
-    shopOwnerId
-  );
-
-  console.log(
-    '============================================'
-  );
-
-  /*
-   * ---------------------------------------------------------
-   * Final normalized tenant object
-   * ---------------------------------------------------------
-   */
 
   return {
     ...fallback,
@@ -745,7 +698,7 @@ export async function fetchProducts(shopOwnerId = getCurrentTenant().shopOwnerId
 
   const { data, error } = await supabase
     .from('products')
-    .select('id, name, price, item_code, qty, color, unit, category, image_path')
+    .select('id, name, price, item_code, qty, color, unit, category, image_path,created_date')
     .eq('shop_owner_id', resolvedShopOwnerId)
     .eq('is_delete', false)
     .limit(1000);
@@ -785,6 +738,7 @@ function normalizeProductRecord(record, fallback = {}) {
   const unit = pickFirstDefined(record, ['unit'], fallback.unit ?? '');
   const imagePath = pickFirstDefined(record, ['image_path'], fallback.image_path ?? '');
   const imageUrl = getPublicImageUrl('product-images', imagePath);
+  const created_date = pickFirstDefined(record, ['created_date'], fallback.created_date ?? null);
 
   return {
     id,
@@ -796,6 +750,7 @@ function normalizeProductRecord(record, fallback = {}) {
     qty: Number(qty),
     unit: String(unit),
     imageUrl,
+    created_date,
   };
 }
 
@@ -1053,9 +1008,6 @@ export async function fetchCustomerProfile(customerId) {
     .eq('id', customerId)
     .maybeSingle();
 
-  console.log('Customer ID:', customerId);
-  console.log('Customer profile:', data);
-  console.log('Customer profile error:', error);
 
   if (error) {
     return {
