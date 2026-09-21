@@ -319,30 +319,31 @@ function AuthPage({ initialMode = 'login' }) {
   };
 
   const handleGoogleLogin = async () => {
-    setOauthLoading(true);
-    setLoginError('');
-    setSignupError('');
+  setOauthLoading(true);
+  setLoginError('');
+  setSignupError('');
 
-    const redirectPath =
-      getTenantPath('/auth');
+  try {
+    const redirectPath = getTenantPath('/auth');
 
-    const { error } =
-      await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo:
-            `${window.location.origin}${redirectPath}`,
-        },
-      });
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}${redirectPath}`,
+      },
+    });
 
     if (error) {
-      setLoginError(
-        getFriendlyMessage(error)
-      );
-
-      setOauthLoading(false);
+      throw error;
     }
-  };
+    // On success, Supabase redirects the whole page to Google —
+    // don't reset oauthLoading here, the page is about to navigate away.
+  } catch (error) {
+    console.error('Google login error:', error);
+    setLoginError(getFriendlyMessage(error));
+    setOauthLoading(false);
+  }
+};
 
   const handleResetPassword = async (event) => {
     event.preventDefault();
