@@ -92,10 +92,11 @@ const whatsappNumber =
   }, [items]);
 
   useEffect(() => {
-  if (cartMode === 'editing') {
-    setRemarks(editingRemarks || '');
-  }
-}, [cartMode, editingQuotationId, editingRemarks]);
+    if (cartMode === 'editing') {
+      setRemarks(editingRemarks || '');
+    }
+  }, [cartMode, editingQuotationId, editingRemarks]);
+
   const handleWhatsappNotify = () => {
   if (whatsappLink) {
     window.open(
@@ -310,6 +311,76 @@ setShowWhatsappPopup(true);
 
   return (
     <section className="page-card">
+      <style>{`
+        .cart-item-row {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          padding: 0.5rem 0;
+          border-bottom: 1px solid #e2e8f0;
+          flex-wrap: nowrap;
+        }
+        .cart-item-color {
+          flex: 1 1 auto;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .cart-item-qty-input {
+          flex-shrink: 0;
+          width: 42px;
+          text-align: center;
+          padding: 0.25rem;
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+        }
+        .cart-item-rate {
+          flex-shrink: 0;
+          min-width: 58px;
+          text-align: right;
+          color: #64748b;
+          font-size: 0.85rem;
+          white-space: nowrap;
+        }
+        .cart-item-subtotal {
+          flex-shrink: 0;
+          font-weight: 600;
+          min-width: 56px;
+          text-align: right;
+          white-space: nowrap;
+        }
+        .cart-item-remove {
+          flex-shrink: 0;
+          font-size: 1rem;
+          line-height: 1;
+          color: #dc2626;
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 0.2rem;
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        @media (max-width: 400px) {
+          .cart-item-rate {
+            min-width: 46px;
+            font-size: 0.78rem;
+          }
+          .cart-item-subtotal {
+            min-width: 46px;
+            font-size: 0.85rem;
+          }
+          .cart-item-qty-input {
+            width: 36px;
+          }
+        }
+      `}</style>
+
       <p className="eyebrow">Cart</p>
 
       <h1>
@@ -367,6 +438,7 @@ setShowWhatsappPopup(true);
                   objectFit: 'cover',
                   borderRadius: '6px',
                   cursor: 'pointer',
+                  flexShrink: 0,
                 }}
               />
             ) : (
@@ -376,6 +448,7 @@ setShowWhatsappPopup(true);
                   height: '48px',
                   backgroundColor: '#e2e8f0',
                   borderRadius: '6px',
+                  flexShrink: 0,
                 }}
               />
             )}
@@ -388,183 +461,90 @@ setShowWhatsappPopup(true);
             </h3>
           </div>
 
-          <table
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-            }}
-          >
-            <thead>
-              <tr
-                style={{
-                  borderBottom: '2px solid #e2e8f0',
-                  textAlign: 'left',
-                }}
-              >
-                <th>Color</th>
-                <th>Qty</th>
-                <th>Rate</th>
-                <th>Subtotal</th>
-                <th></th>
-              </tr>
-            </thead>
+          <div>
+            {group.variants.map((item) => (
+              <div key={item.product.id} className="cart-item-row">
+                <span className="cart-item-color">{item.product.color || 'Default'}</span>
 
-            <tbody>
-              {group.variants.map((item) => (
-                <tr
-                  key={item.product.id}
-                  style={{
-                    borderBottom: '1px solid #e2e8f0',
+                <input
+                  type="number"
+                  min="0"
+                  className="cart-item-qty-input"
+                  value={
+                    draftQuantities[item.product.id] ??
+                    String(item.quantity)
+                  }
+                  onChange={(event) => {
+                    const nextValueText =
+                      event.target.value;
+
+                    setDraftQuantities((current) => ({
+                      ...current,
+                      [item.product.id]:
+                        nextValueText,
+                    }));
+
+                    if (nextValueText === '') {
+                      return;
+                    }
+
+                    const nextValue =
+                      Number(nextValueText);
+
+                    if (
+                      !Number.isFinite(nextValue) ||
+                      nextValue < 0
+                    ) {
+                      return;
+                    }
+
+                    updateQuantity(
+                      item.product.id,
+                      nextValue
+                    );
                   }}
+                  onBlur={() => {
+                    const currentValue =
+                      draftQuantities[item.product.id] ??
+                      String(item.quantity);
+
+                    const cleaned =
+                      currentValue === ''
+                        ? String(item.quantity)
+                        : currentValue;
+
+                    setDraftQuantities((current) => ({
+                      ...current,
+                      [item.product.id]: cleaned,
+                    }));
+                  }}
+                />
+
+                <span className="cart-item-rate">
+                  {formatCurrency(item.product.price)}
+                  {item.product.unit ? `/${item.product.unit}` : ''}
+                </span>
+
+                <span className="cart-item-subtotal">
+                  {formatCurrency(
+                    item.quantity * item.product.price
+                  )}
+                </span>
+
+                <button
+                  type="button"
+                  className="cart-item-remove"
+                  onClick={() =>
+                    removeFromCart(item.product.id)
+                  }
+                  aria-label={`Remove ${item.product.name} (${item.product.color || 'Default'}) from cart`}
+                  title="Remove"
                 >
-                  <td>
-                    {item.product.color || 'Default'}
-                  </td>
-
-                  <td>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                      }}
-                    >
-                      <button
-                        type="button"
-                        className="text-button"
-                        onClick={() => {
-                          if (item.quantity <= 0) {
-                            return;
-                          }
-
-                          updateQuantity(
-                            item.product.id,
-                            item.quantity - 1
-                          );
-                        }}
-                        style={{
-                          minWidth: '26px',
-                          padding: '0.15rem 0.4rem',
-                        }}
-                        aria-label={`Decrease quantity for ${item.product.name}`}
-                      >
-                        −
-                      </button>
-
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={
-                          draftQuantities[item.product.id] ??
-                          String(item.quantity)
-                        }
-                        onChange={(event) => {
-                          const nextValueText =
-                            event.target.value;
-
-                          setDraftQuantities((current) => ({
-                            ...current,
-                            [item.product.id]:
-                              nextValueText,
-                          }));
-
-                          if (nextValueText === '') {
-                            return;
-                          }
-
-                          const nextValue =
-                            Number(nextValueText);
-
-                          if (
-                            !Number.isFinite(nextValue) ||
-                            nextValue < 0
-                          ) {
-                            return;
-                          }
-
-                          updateQuantity(
-                            item.product.id,
-                            nextValue
-                          );
-                        }}
-                        onBlur={() => {
-                          const currentValue =
-                            draftQuantities[item.product.id] ??
-                            String(item.quantity);
-
-                          const cleaned =
-                            currentValue === ''
-                              ? String(item.quantity)
-                              : currentValue;
-
-                          setDraftQuantities((current) => ({
-                            ...current,
-                            [item.product.id]: cleaned,
-                          }));
-                        }}
-                        style={{
-                          width: '60px',
-                          textAlign: 'center',
-                        }}
-                      />
-
-                      <button
-                        type="button"
-                        className="text-button"
-                        onClick={() =>
-                          updateQuantity(
-                            item.product.id,
-                            item.quantity + 1
-                          )
-                        }
-                        style={{
-                          minWidth: '26px',
-                          padding: '0.15rem 0.4rem',
-                        }}
-                        aria-label={`Increase quantity for ${item.product.name}`}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </td>
-
-                  <td>
-                    {formatCurrency(item.product.price)}
-
-                    {item.product.unit ? (
-                      <span
-                        style={{
-                          marginLeft: '0.2rem',
-                          color: '#64748b',
-                        }}
-                      >
-                        /{item.product.unit}
-                      </span>
-                    ) : null}
-                  </td>
-
-                  <td>
-                    {formatCurrency(
-                      item.quantity * item.product.price
-                    )}
-                  </td>
-
-                  <td>
-                    <button
-                      type="button"
-                      className="text-button"
-                      onClick={() =>
-                        removeFromCart(item.product.id)
-                      }
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       ))}
 

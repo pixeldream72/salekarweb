@@ -819,16 +819,19 @@ export async function createQuotation({ shopOwnerId, customerId, customerEmail, 
   const now = Date.now();
   const totalAmount = items.reduce((sum, item) => sum + Number(item.quantity) * Number(item.product.price), 0);
   const quotationId = globalThis.crypto?.randomUUID?.() ?? `Q-${Date.now()}`;
+ 
 
   // Fetch the customer's profile — includes name, phone, and their last quotation number
   const { data: profile } = await supabase
     .from('customer_profile')
-    .select('full_name, phone, last_quotation_no')
+    .select('full_name, phone,city,cargo, last_quotation_no',)
     .eq('id', customerId)
     .maybeSingle();
 
   const customerName = profile?.full_name || 'Customer';
   const customerPhone = profile?.phone || '';
+  const customerCity = profile?.city || '';
+  const customerCargo = profile?.cargo || '';
   const nextNumber = (profile?.last_quotation_no || 0) + 1;
 
   // Save the new counter value back to their profile
@@ -849,6 +852,8 @@ export async function createQuotation({ shopOwnerId, customerId, customerEmail, 
         customer_id: customerId,
         customer_name: customerName,
         customer_phone: customerPhone,
+        customer_city: customerCity,
+        customer_cargo: customerCargo,
         quotation_no: quotationNo,
         total_amount: totalAmount,
         status: 'pending',
